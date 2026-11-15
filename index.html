@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10172a"><title>Someone Else's Sky — Skyre</title>
+<link rel="stylesheet" href="./style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head>
+<body>
+<main><header><div><span class="eyebrow">SKYRE · AN INTERTWINED UNIVERSE</span><h1>Someone Else's <em>Sky</em></h1></div><span class="star">✳</span></header>
+<p class="sub">Your world's sun is a lamp on somebody else's desk. What you do here changes their sky.</p>
+<div class="view"><div id="scene" aria-label="3D desk with a globe containing an island"></div>
+<div class="scene-label">✦ <span id="viewLabel">THE WORLD INSIDE YOUR GLOBE</span></div><div class="hint">Drag to orbit · Scroll or pinch to zoom</div></div>
+<section class="status"><div><small>YOU ARE GROUP</small><div class="switch"><button id="groupA" class="selected">A</button><button id="groupB">B</button></div></div><div><small>YOUR GLOBE HOLDS</small><strong id="otherName">Moon Garden</strong></div><div><small>THEIR SKY</small><strong id="skyState">Night</strong></div></section>
+<section><h2>Change their world</h2><div class="actions"><button id="lamp" class="action"><span>☀</span><div><b>Turn the lamp</b><small>Give their island a sunrise</small></div></button><button id="mirror" class="action"><span>☾</span><div><b>Rotate mirror</b><small>Catch the moonbeam</small></div></button><button id="seed" class="action"><span>✧</span><div><b>Release a seed</b><small>Grow something in their world</small></div></button></div></section>
+<section class="activity"><h2>Whispers from afar</h2><div id="log" aria-live="polite"></div></section>
+<footer>This is a local two-group prototype. Real Telegram group synchronization requires a backend.</footer></main>
+<script type="module" src="./app.js"></script>
+</body></html>
