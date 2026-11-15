@@ -29,7 +29,7 @@ function onHit(hit){
     err=removeAt(w,x,z);success='Building removed. Some materials were recovered.';
   }else if(mode==='farm'){
     const b=findAt(w,x,z);
-    if(b?.type==='plot'&&b.crop){err=harvest(game,group,x,z);success=`Harvested ${CROP[b.crop.kind].name}!`}
+    if(b?.type==='plot'&&b.crop){const kind=b.crop.kind;err=harvest(game,group,x,z);success=`Harvested ${CROP[kind].name}!`}
     else {err=plant(game,group,x,z,chosenCrop);success=`Planted ${CROP[chosenCrop].name}. Come back as it grows.`}
   }else{showToast(tileInfo(x,z));return}
   if(err){showToast(err);return}
