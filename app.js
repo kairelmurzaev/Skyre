@@ -1,58 +1,100 @@
-import * as THREE from 'three';
-import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {SAVE_KEY,CROP,BUILD,other,loadGame,saveGame,findAt,buildAt,removeAt,received,growth,plant,harvest,gather,processBuilding,sendSeed,record,canAfford} from './core.js';
+import {createScene} from './scene.js';
 
-const KEY='skyre-demo-v1';
-const defaults={a:{name:'Amber Hollow',lamp:false,mirror:0,seeds:1},b:{name:'Moon Garden',lamp:false,mirror:0,seeds:1},events:[]};
-let store;try{store=JSON.parse(localStorage.getItem(KEY))||structuredClone(defaults)}catch{store=structuredClone(defaults)}
-for(const id of ['a','b'])store[id]={...defaults[id],...store[id]};
-store.events=Array.isArray(store.events)?store.events:[];
-let group='a';
-const other=()=>group==='a'?'b':'a';
-const save=()=>localStorage.setItem(KEY,JSON.stringify(store));
 const $=id=>document.getElementById(id);
-const scene=new THREE.Scene();scene.background=new THREE.Color('#17243e');
-const camera=new THREE.PerspectiveCamera(42,1,.1,100);camera.position.set(6,4.7,8.5);
-const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;
-renderer.shadowMap.enabled=true;$('scene').append(renderer.domElement);
-const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.target.set(0,.5,0);controls.minDistance=4;controls.maxDistance=16;controls.maxPolarAngle=Math.PI*.49;
-scene.add(new THREE.HemisphereLight('#c8deff','#473340',2.1));
-const mainLight=new THREE.DirectionalLight('#ffe3bd',2.8);mainLight.position.set(-4,8,5);mainLight.castShadow=true;scene.add(mainLight);
-const mat=(color,roughness=.8,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness});
-const make=(parent,geo,material,pos=[0,0,0],rotation=[0,0,0])=>{let mesh=new THREE.Mesh(geo,material);mesh.position.set(...pos);mesh.rotation.set(...rotation);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh};
-make(scene,new THREE.BoxGeometry(12,.45,8),mat('#513c44'),[0,-.95,0]);
-make(scene,new THREE.BoxGeometry(12,.04,8),mat('#7e6165'),[0,-.7,0]);
-const globe=new THREE.Group();globe.position.set(.2,.92,0);scene.add(globe);
-const glass=make(globe,new THREE.SphereGeometry(1.62,48,32),new THREE.MeshPhysicalMaterial({color:'#aedaff',transparent:true,opacity:.15,roughness:.08,metalness:.05,side:THREE.FrontSide,depthWrite:false,clearcoat:1}));
-make(globe,new THREE.CylinderGeometry(.9,1,.25,48),mat('#b49a75',.3,.7),[0,-1.76,0]);
-make(globe,new THREE.CylinderGeometry(.85,.88,.17,48),mat('#353849',.4,.4),[0,-1.59,0]);
-const island=new THREE.Group();island.position.y=-.52;globe.add(island);
-const ocean=make(island,new THREE.CylinderGeometry(1.16,1.09,.2,64),mat('#2b6390',.35),[0,-.15,0]);
-const land=make(island,new THREE.SphereGeometry(1.01,36,20),mat('#5e978b'),[0,.02,0]);land.scale.y=.35;
-make(island,new THREE.ConeGeometry(.48,.63,6),mat('#91a8a0'),[-.32,.36,-.23]);
-make(island,new THREE.ConeGeometry(.34,.48,5),mat('#b0b7a5'),[.38,.25,-.34]);
-make(island,new THREE.BoxGeometry(.3,.3,.3),mat('#e6bca5'),[.28,.34,.35]);
-make(island,new THREE.ConeGeometry(.27,.25,4),mat('#a57486'),[.28,.62,.35],[0,Math.PI/4,0]);
-const trees=new THREE.Group();island.add(trees);
-const positions=[[-.55,.2,.1],[.59,.18,.05],[-.18,.18,.58],[.28,.17,-.58],[-.7,.12,-.28],[.63,.13,.43],[0,.17,-.75],[.1,.2,.63],[0,.28,0]];
-for(let i=0;i<9;i++){const t=new THREE.Group();t.position.set(...positions[i]);make(t,new THREE.CylinderGeometry(.035,.048,.28,7),mat('#866455'),[0,.13,0]);make(t,new THREE.IcosahedronGeometry(.19,1),mat(i%2?'#6ea991':'#9cc7a2'),[0,.35,0]);t.userData.index=i;trees.add(t)}
-const glow=new THREE.PointLight('#ffc47d',0,5);glow.position.set(-2.5,1.3,0);scene.add(glow);
-const lamp=new THREE.Group();lamp.position.set(-2.7,0,-.4);scene.add(lamp);
-make(lamp,new THREE.CylinderGeometry(.45,.5,.14,24),mat('#c3a174',.4,.6),[0,-.58,0]);
-make(lamp,new THREE.CylinderGeometry(.055,.055,1.6,14),mat('#c3a174',.3,.7),[0,.23,0]);
-make(lamp,new THREE.CylinderGeometry(.06,.06,.9,14),mat('#c3a174',.3,.7),[.33,1.12,0],[0,0,-.85]);
-make(lamp,new THREE.ConeGeometry(.52,.65,28),mat('#cfb289',.4,.5),[.69,1.35,0],[0,0,-.3]);
-const bulb=make(lamp,new THREE.SphereGeometry(.15,16,16),mat('#fff2b6'),[.82,1.03,0]);
-const mirror=new THREE.Group();mirror.position.set(2.6,.1,-.2);scene.add(mirror);
-make(mirror,new THREE.CylinderGeometry(.43,.45,.1,26),mat('#c0a273',.35,.7),[0,-.7,0]);
-make(mirror,new THREE.CylinderGeometry(.045,.05,.98,12),mat('#c0a273',.3,.7),[0,-.2,0]);
-const mirrorFace=make(mirror,new THREE.CylinderGeometry(.53,.53,.07,40),mat('#c6e7fa',.1,.7),[0,.34,0],[Math.PI/2,0,0]);
-const beam=make(globe,new THREE.OctahedronGeometry(.18),new THREE.MeshStandardMaterial({color:'#b5f4ff',emissive:'#65e5ff',emissiveIntensity:2}),[.1,.8,-.2]);
-const sun=make(globe,new THREE.SphereGeometry(.12,16,16),new THREE.MeshStandardMaterial({color:'#fff0c6',emissive:'#e7a25f',emissiveIntensity:2}),[.78,1,.1]);
-function renderState(){const w=store[group],inside=store[other()],daylight=w.lamp;glass.material.color.set(daylight?'#d4efff':'#77a8e5');ocean.material.color.set(daylight?'#4b9fc3':'#28527d');land.material.color.set(daylight?'#7cba96':'#4b7d84');glow.intensity=daylight?5:0;bulb.material.emissive=new THREE.Color(daylight?'#ffbb65':'#000000');beam.visible=w.mirror===2;sun.material.emissiveIntensity=daylight?4:1;mirrorFace.rotation.z=w.mirror*.45;trees.children.forEach((t,i)=>t.visible=i<Math.min(9,inside.seeds+1));$('otherName').textContent=inside.name;$('skyState').textContent=daylight?'Sunrise':'Night';$('groupA').classList.toggle('selected',group==='a');$('groupB').classList.toggle('selected',group==='b');$('log').replaceChildren();(store.events.length?store.events.slice(-5).reverse():[{text:'No one has stirred the universe yet.'}]).forEach(e=>{const p=document.createElement('div');p.className='event';p.textContent=e.text;$('log').append(p)})}
-function act(type){const w=store[group],target=store[other()];let text='';if(type==='lamp'){w.lamp=!w.lamp;text=group.toUpperCase()+' turned '+target.name+"'s sky "+(w.lamp?'to sunrise.':'to night.')}if(type==='mirror'){w.mirror=(w.mirror+1)%3;text=group.toUpperCase()+' rotated the mirror'+(w.mirror===2?'; a moonbeam found '+target.name+'.':'.')}if(type==='seed'){target.seeds=Math.min(9,target.seeds+1);text='A seed from group '+group.toUpperCase()+' grew in '+target.name+'.'}store.events.push({text});store.events=store.events.slice(-30);save();renderState()}
-for(const type of ['lamp','mirror','seed'])$(type).addEventListener('click',()=>act(type));
-for(const g of ['a','b'])$('group'+g.toUpperCase()).addEventListener('click',()=>{group=g;renderState()});
-function resize(){let el=$('scene');renderer.setSize(el.clientWidth,el.clientHeight);camera.aspect=el.clientWidth/el.clientHeight;camera.updateProjectionMatrix()}
-addEventListener('resize',resize);resize();renderState();let time=0;renderer.setAnimationLoop(()=>{time+=.008;globe.rotation.y=Math.sin(time*.25)*.045;sun.position.y=1+Math.sin(time)*.06;controls.update();renderer.render(scene,camera)});
+const game=loadGame(localStorage);
+let group='a',mode='explore',chosenBuild='plot',chosenCrop='wheat',rotation=0,zoomed=false,toastTimer;
+const entries=[['wood','🪵','Wood'],['stone','◈','Stone'],['seeds','✧','Seeds'],['wheat','🌾','Wheat'],['flour','◌','Flour'],['food','🍞','Food'],['coins','✦','Coins']];
+const showToast=text=>{const el=$('toast');el.textContent=text;el.classList.add('shown');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('shown'),3200)};
+const costLabel=cost=>Object.entries(cost).map(([k,v])=>`${v} ${k}`).join(' · ');
+const tileInfo=(x,z)=>{
+  const b=findAt(game[group],x,z);
+  if(!b)return 'Empty tile. Choose Build to create something here.';
+  if(b.type==='plot'&&b.crop){const pct=Math.round(growth(game,group,b)*100);return pct===100?`${CROP[b.crop.kind].name} is ready! Choose Farm and tap to harvest.`:`${CROP[b.crop.kind].name} growing (${pct}%).`}
+  if(b.type==='windmill')return 'Windmill: turn harvested wheat into flour using Craft & Produce.';
+  if(b.type==='bakery')return 'Bakery: transform flour into bread and coins below.';
+  return `${BUILD[b.type]?.name||b.type}. Choose Remove to reclaim half its building materials.`;
+};
+let view;
+function onHit(hit){
+  if(hit.kind==='lamp'){toggleLamp();return}
+  if(hit.kind==='mirror'){turnMirror();return}
+  if(hit.kind==='gather'){gatherResource(hit.type);return}
+  if(hit.kind!=='tile')return;
+  const {x,z}=hit,w=game[group];let err=null,success='';
+  if(mode==='build'){
+    err=buildAt(w,chosenBuild,x,z,rotation);
+    success=`Built ${BUILD[chosenBuild].name}. Your village is growing!`;
+  }else if(mode==='demolish'){
+    err=removeAt(w,x,z);success='Building removed. Some materials were recovered.';
+  }else if(mode==='farm'){
+    const b=findAt(w,x,z);
+    if(b?.type==='plot'&&b.crop){err=harvest(game,group,x,z);success=`Harvested ${CROP[b.crop.kind].name}!`}
+    else {err=plant(game,group,x,z,chosenCrop);success=`Planted ${CROP[chosenCrop].name}. Come back as it grows.`}
+  }else{showToast(tileInfo(x,z));return}
+  if(err){showToast(err);return}
+  record(game,`${w.name}: ${success}`);commit(success);
+}
+try{view=createScene($('scene'),{onHit,getMode:()=>mode})}catch(err){
+  $('scene').insertAdjacentHTML('afterbegin','<p style="padding:30px;color:#ffdfb7">Your browser could not start 3D graphics. Try a browser with WebGL enabled.</p>');
+  console.error('Skyre WebGL:',err);
+}
+function commit(message){saveGame(localStorage,game);render();if(message)showToast(message)}
+function toggleLamp(){game[group].lamp=!game[group].lamp;const text=game[group].lamp?`Your lamp brought sunrise to ${game[other(group)].name}.`:`Your lamp let night fall over ${game[other(group)].name}.`;record(game,text);commit(text)}
+function turnMirror(){game[group].mirror=(game[group].mirror+1)%3;const text=game[group].mirror===2?`Your moonbeam reached ${game[other(group)].name}.`:'The mirror moved. Two turns may align the moonbeam.';record(game,text);commit(text)}
+function giftSeed(){const err=sendSeed(game,group);if(err)return showToast(err);const text=`You gifted two seeds to ${game[other(group)].name}.`;record(game,text);commit(text)}
+function gatherResource(kind){const err=gather(game[group],kind);if(err)return showToast(err);const text=kind==='wood'?'Gathered 5 wood from the grove.':'Collected 4 stone from the quarry.';record(game,`${game[group].name}: ${text}`);commit(text)}
+function setMode(next){mode=next;render()}
+function renderCatalog(){const el=$('catalog');el.replaceChildren();let items=[];
+  if(mode==='build')items=Object.entries(BUILD).map(([id,v])=>({id,icon:v.icon,title:v.name,sub:costLabel(v.cost),active:id===chosenBuild}));
+  if(mode==='farm')items=Object.entries(CROP).map(([id,v])=>({id,icon:id==='moonflower'?'🌙':id==='wheat'?'🌾':'🥕',title:v.name,sub:`${v.seed} seed${v.seed>1?'s':''} · ${Math.round(v.ms/1000)}s`,active:id===chosenCrop}));
+  if(mode==='explore')items=[{id:'wood',icon:'🌲',title:'Gather wood',sub:'5 wood · 12s regrowth'},{id:'stone',icon:'🪨',title:'Mine stone',sub:'4 stone · 12s regrowth'}];
+  if(mode==='demolish')items=[{id:'remove',icon:'♻',title:'Remove buildings',sub:'Tap a placed building · recover half its materials'}];
+  for(const item of items){const btn=document.createElement('button');btn.className='item'+(item.active?' selected':'');btn.type='button';
+    const emoji=document.createElement('span');emoji.className='emoji';emoji.textContent=item.icon;
+    const body=document.createElement('span'),title=document.createElement('strong'),sub=document.createElement('small');title.textContent=item.title;sub.textContent=item.sub;body.append(title,sub);btn.append(emoji,body);
+    btn.addEventListener('click',()=>{
+      if(mode==='build'){chosenBuild=item.id;render()}else if(mode==='farm'){chosenCrop=item.id;render()}
+      else if(mode==='explore')gatherResource(item.id);
+    });el.append(btn);
+  }
+  $('rotate-hint').textContent=mode==='build'?`Rotation ${rotation*90}° · R to rotate`:mode==='farm'?'Crops grow while offline':'Drag to orbit';
+  const copy={explore:'Tap <b>trees or rocks</b> in the 3D world to collect materials. Tap buildings to inspect them.',farm:'Choose a crop, then <b>tap an empty garden plot</b>. Return to harvest when it has grown. Sunlight from the other group speeds growth.',build:'Choose a building, then <b>tap an empty glowing tile</b> to place it. Use the button below or <b>R</b> to rotate.',demolish:'Tap a building to <b>remove it</b>. You recover half the original wood and stone.'};
+  $('tool-help').innerHTML=copy[mode]+(mode==='build'?' <button type="button" id="rotate-button" class="reset">↻ Rotate building</button>':'');
+  $('rotate-button')?.addEventListener('click',()=>{rotation=(rotation+1)%4;render()});
+  $('scene-hint').textContent={explore:'Explore: tap a tree or rock to gather',farm:'Farm: tap a plot to plant or harvest',build:'Build: tap a glowing tile to place',demolish:'Remove: tap a building to recycle'}[mode];
+}
+function renderProduction(){const el=$('production');el.replaceChildren();const w=game[group];const recipes=[{type:'windmill',title:'🌾 Grind cloud wheat',desc:'3 wheat → 2 flour',needs:{wheat:3}},{type:'bakery',title:'🥖 Bake fresh bread',desc:'2 flour → 6 food + 4 coins',needs:{flour:2}}];
+  for(const r of recipes){const btn=document.createElement('button');btn.className='recipe';const built=w.buildings.some(b=>b.type===r.type);const affordable=canAfford(w,r.needs);btn.disabled=!built||!affordable;
+    const b=document.createElement('b'),sm=document.createElement('small');b.textContent=r.title;sm.textContent=built?r.desc:'Build a '+BUILD[r.type].name+' to unlock';btn.append(b,sm);
+    btn.onclick=()=>{const err=processBuilding(w,r.type);if(err)return showToast(err);const text=r.type==='windmill'?'Your windmill made 2 flour.':'Your bakery made bread and earned 4 coins.';record(game,`${w.name}: ${text}`);commit(text)};
+    el.append(btn);
+  }
+}
+function render(){const w=game[group],n=game[other(group)],effects=received(game,group);
+  $('world-name').textContent=w.name;$('neighbor-name').textContent=n.name;
+  $('sky-badge').textContent=effects.sun?'☼ Borrowed sunshine':'☾ Gentle twilight';
+  $('neighbor-details').textContent=`${n.buildings.length} buildings · ${n.resources.food} food`;
+  $('effect-note').textContent=effects.sun?'☀ The other group is lighting your farms: crops grow 20% faster.':effects.moonbeam?'☾ Their moonbeam blesses your harvests with extra coins.':'✧ Another group can send sunlight, moonlight, and seeds to your village.';
+  $('resources').replaceChildren();for(const [id,icon,label] of entries){const cell=document.createElement('div');cell.className='resource';const num=document.createElement('span'),cap=document.createElement('span');num.className='number';cap.className='caption';num.textContent=icon+' '+(w.resources[id]||0);cap.textContent=label;cell.append(num,cap);$('resources').append(cell)}
+  document.querySelectorAll('[data-group]').forEach(btn=>btn.classList.toggle('active',btn.dataset.group===group));
+  document.querySelectorAll('[data-mode]').forEach(btn=>btn.classList.toggle('active',btn.dataset.mode===mode));
+  $('toggle-lamp').querySelector('small').textContent=w.lamp?'Turn off their sunlight':'Give them sunlight';
+  $('turn-mirror').querySelector('small').textContent=w.mirror===2?'Moonbeam is aligned':'Angle '+(w.mirror+1)+'/3 · redirect moonlight';
+  $('events').replaceChildren();const recent=game.events.length?game.events.slice(0,5):[{message:'Nothing has stirred the universe yet. Be the first.'}];
+  for(const e of recent){const div=document.createElement('div');div.className='event';div.textContent=e.message;if(e.at){const time=document.createElement('time');time.textContent=new Date(e.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});div.append(time)}$('events').append(div)}
+  renderCatalog();renderProduction();view?.refresh(game,group);
+}
+for(const button of document.querySelectorAll('[data-group]'))button.addEventListener('click',()=>{group=button.dataset.group;zoomed=false;view?.setCamera(false);render();showToast(`You entered ${game[group].name}.`)});
+for(const button of document.querySelectorAll('[data-mode]'))button.addEventListener('click',()=>setMode(button.dataset.mode));
+$('toggle-lamp').onclick=toggleLamp;$('turn-mirror').onclick=turnMirror;$('send-seed').onclick=giftSeed;
+$('camera-btn').onclick=()=>{zoomed=!zoomed;view?.setCamera(zoomed);$('camera-btn').textContent=zoomed?'⌕ Zoom out':'⌕ Zoom in'};
+$('reset').onclick=()=>{if(!confirm('Reset both demo villages and remove all saved progress in this browser?'))return;localStorage.removeItem(SAVE_KEY);location.reload()};
+document.addEventListener('keydown',event=>{if(event.key.toLowerCase()==='r'&&mode==='build'){rotation=(rotation+1)%4;render()}if(event.key==='Escape'){setMode('explore')}});
+// Crop progress uses actual wall-clock timestamps, so plants continue growing between visits.
+setInterval(()=>{if(document.visibilityState==='visible'){
+  const active=game[group].buildings.some(b=>b.type==='plot'&&b.crop);
+  if(active)view?.refresh(game,group);
+}},4500);
+render();
 try{window.Telegram?.WebApp?.ready();window.Telegram?.WebApp?.expand()}catch{}
