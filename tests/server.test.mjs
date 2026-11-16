@@ -69,6 +69,8 @@ test('HTTP refuses unsigned requests and accepts validated Telegram requests',as
     const massive=await fetch(base+'/api/action',{method:'POST',headers:{...headers,'content-type':'application/json'},body:'{'+ 'x'.repeat(5000)});
     assert.equal(massive.status,413);
     assert.equal((await fetch(base+'/core.js')).status,200);
+    // Telegram Web can host a Mini App in a cross-site iframe.
+    assert.equal((await fetch(base+'/')).headers.get('x-frame-options'),null);
     assert.equal((await fetch(base+'/.env')).status,404);
   }finally{await new Promise(resolve=>server.close(resolve));store.close();}
 });

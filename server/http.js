@@ -42,7 +42,7 @@ export function createSkyreServer({store,botToken,publicDir=process.cwd(),now=Da
       const file=join(dir,filename);
       await stat(file);
       const bytes=await readFile(file);
-      res.writeHead(200,{'content-type':mime[extname(filename)]||'application/octet-stream','x-content-type-options':'nosniff','referrer-policy':'no-referrer','cache-control':'no-cache','x-frame-options':'SAMEORIGIN'});
+      res.writeHead(200,{'content-type':mime[extname(filename)]||'application/octet-stream','x-content-type-options':'nosniff','referrer-policy':'no-referrer','cache-control':'no-cache'});
       if(req.method==='HEAD')return res.end();
       res.end(bytes);
     }catch(err){error(res,err instanceof AuthError?err:err);}
