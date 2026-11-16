@@ -1,6 +1,7 @@
 // Villager automation, independent of the renderer and browser storage.
 // Workers only change their own world; their actions never require another group online.
-import {CROP, findAt, growth, plant, harvest, processBuilding, orchardReady, harvestOrchard, received} from './core.js';
+import {CROP, plant, harvest, processBuilding, harvestOrchard, received} from './core.js';
+import {planWorkerRoute, workInterval} from './routing.js';
 
 export const JOBS = {
   idle:   {name:'Rest', icon:'☕', detail:'Wanders and enjoys the village', ms:30000},
@@ -29,7 +30,7 @@ export function syncWorkers(world,now=Date.now()){
       const i=index*2+n;
       const job=old&&JOBS[old.job]?old.job:(i===0?'farmer':i===1?'forager':'idle');
       const nextAt=old&&Number.isFinite(old.nextAt)?old.nextAt:now+JOBS[job].ms;
-      roster.push({id,name:old?.name||FIRST_NAMES[i%FIRST_NAMES.length],homeId:home.id,job,nextAt});
+      roster.push({id,name:old?.name||FIRST_NAMES[i%FIRST_NAMES.length],homeId:home.id,job,nextAt,trip:old?.job===job?old?.trip:null});
     }
   });
   world.workers=roster;
@@ -44,6 +45,7 @@ export function assignWorker(world,workerId,job,now=Date.now()){
   if(worker.job===job)return null;
   worker.job=job;
   worker.nextAt=now+JOBS[job].ms;
+  worker.trip=null;
   return null;
 }
 
@@ -64,23 +66,30 @@ function addLog(world,worker,action,at){
 
 function doWork(game,id,worker,at){
   const world=game[id];
+  const plan=planWorkerRoute(game,id,worker,at);
+  if(!plan)return null; // A missing workshop or blocked walk route cannot magically produce goods.
+  const {x,z}=plan.target;
   if(worker.job==='farmer'){
-    const ripe=world.buildings.find(b=>b.type==='plot'&&b.crop&&growth(game,id,b,at)>=1);
-    if(ripe && !harvest(game,id,ripe.x,ripe.z,at))return 'harvested';
-    const orchard=world.buildings.find(b=>b.type==='orchard'&&orchardReady(b,at,received(game,id).breeze));
-    if(orchard && !harvestOrchard(world,orchard.x,orchard.z,at,received(game,id).breeze))return 'orchards';
-    const empty=world.buildings.find(b=>b.type==='plot'&&!b.crop);
-    if(empty && !plant(game,id,empty.x,empty.z,world.autoCrop,at))return 'planted';
+    if(plan.task==='harvest' && !harvest(game,id,x,z,at))return 'harvested';
+    if(plan.task==='orchard' && !harvestOrchard(world,x,z,at,received(game,id).breeze))return 'orchards';
+    if(plan.task==='plant' && !plant(game,id,x,z,world.autoCrop,at))return 'planted';
   }
   if(worker.job==='miller' && !processBuilding(world,'windmill'))return 'milled';
   if(worker.job==='baker' && !processBuilding(world,'bakery'))return 'baked';
   if(worker.job==='forager'){
     if(world.resources.wood>=250 && world.resources.stone>=250)return null;
-    world.resources.wood=Math.max(world.resources.wood,Math.min(250,world.resources.wood+3));
-    world.resources.stone=Math.max(world.resources.stone,Math.min(250,world.resources.stone+2));
+    world.resources.wood=Math.min(250,world.resources.wood+3);
+    world.resources.stone=Math.min(250,world.resources.stone+2);
     return 'foraged';
   }
   return null;
+}
+
+function scheduleNext(game,id,worker,at){
+  const plan=planWorkerRoute(game,id,worker,at);
+  const duration=workInterval(game[id],worker,JOBS[worker.job].ms,plan);
+  worker.trip=plan ? {points:plan.route.points,startedAt:at,endsAt:at+duration,task:plan.task,roadSteps:plan.route.roadSteps} : null;
+  worker.nextAt=at+duration;
 }
 
 /** Advance all villages chronologically, including offline progress. Returns successful work counts.
@@ -105,15 +114,15 @@ export function advanceGame(game,now=Date.now()){
       }
       if(!ready)break;
       const at=ready.nextAt;
-      ready.nextAt=at+JOBS[ready.job].ms;
       const action=doWork(game,id,ready,at);
       if(action){counts[id][action]++;addLog(world,ready,action,at);}
+      scheduleNext(game,id,ready,at);
     }
     // If the safety budget was exhausted, discard remaining past-due cycles.
     // Otherwise players with huge villages could receive the same offline backlog repeatedly.
     if(safety>12000){
       for(const worker of world.workers){
-        if(worker.nextAt<=now)worker.nextAt=now+JOBS[worker.job].ms;
+        if(worker.nextAt<=now)scheduleNext(game,id,worker,now);
       }
     }
     world.simulatedAt=now;

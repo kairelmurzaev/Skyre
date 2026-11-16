@@ -28,3 +28,14 @@
 .worker-log-title{color:#c6c5ad;font-size:9px;font-weight:800;letter-spacing:1.7px;margin-top:19px;margin-bottom:9px}
 .worker-journal{display:flex;flex-direction:column;gap:5px}.worker-event{font-size:11px;color:#a9c7ca;padding:9px 11px;background:#152638;border-left:2px solid #a8bd9c;border-radius:4px;line-height:1.4}
 @media(max-width:560px){.workers{grid-template-columns:1fr}.job-select{width:43%;max-width:170px}.workers-controls{flex-wrap:wrap}.workers-controls select{flex:1}}
+
+/* v0.4 route logistics: worker cards wrap around useful, accessible route controls. */
+.logistics-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.logistics-stats>div{background:#152b38;border:1px solid #6e898055;border-radius:12px;padding:14px 10px;text-align:center}
+.logistics-stats span{display:block;color:#f3daa8;font-weight:700;font-size:18px;letter-spacing:.1px}
+.logistics-stats small{display:block;color:#a6bfca;margin-top:7px;font-size:10px;line-height:1.4}
+.logistics-hint{margin-top:13px;color:#c5dbd5;font-size:11px;line-height:1.7;border-left:2px solid #b2ce9e;padding:7px 0 7px 12px}
+.worker-card{flex-wrap:wrap}
+.route-button{display:block;width:100%;border:1px solid #718b8a77;border-radius:8px;background:#1b3444;color:#b6d8d4;font-size:10px;padding:9px 10px;text-align:left;line-height:1.5}
+.route-button.selected{border-color:#f2d79a;color:#fbe9bc;background:#3b4d53}
+@media(max-width:430px){.logistics-stats{gap:5px}.logistics-stats>div{padding:11px 5px}.logistics-stats span{font-size:15px}.logistics-stats small{font-size:9px}}

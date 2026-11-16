@@ -1,12 +1,13 @@
 import {SAVE_KEY,CROP,BUILD,other,loadGame,saveGame,findAt,buildAt,removeAt,moveAt,rotateAt,received,growth,plant,harvest,harvestOrchard,orchardReady,gather,processBuilding,sendSeed,record,canAfford,GOALS,goalReady,claimGoal} from './core.js';
 import {createScene} from './scene.js';
 import {JOBS,syncWorkers,assignWorker,setAutoCrop,advanceGame,MAX_OFFLINE_MS} from './workers.js';
+import {planWorkerRoute,roadSummary,workInterval} from './routing.js';
 
 const $=id=>document.getElementById(id);
 const game=loadGame(localStorage);
 const initialWork=advanceGame(game,Date.now());
 saveGame(localStorage,game);
-let group='a',mode='explore',chosenBuild='plot',chosenCrop='wheat',rotation=0,zoomed=false,toastTimer,selectedMove=null;
+let group='a',mode='explore',chosenBuild='plot',chosenCrop='wheat',rotation=0,zoomed=false,toastTimer,selectedMove=null,selectedRoute=null;
 const entries=[['wood','🪵','Wood'],['stone','◈','Stone'],['seeds','✧','Seeds'],['wheat','🌾','Wheat'],['flour','◌','Flour'],['food','🍞','Food'],['coins','✦','Coins']];
 const showToast=text=>{const el=$('toast');el.textContent=text;el.classList.add('shown');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('shown'),3200)};
 const costLabel=cost=>Object.entries(cost).map(([k,v])=>`${v} ${k}`).join(' · ');
@@ -103,6 +104,7 @@ function renderProduction(){const el=$('production');el.replaceChildren();const 
 }
 function workerStatus(world,worker){
   if(worker.job==='idle')return 'Off duty';
+  if(!planWorkerRoute(game,group,worker))return 'No reachable workplace · check nearby buildings';
   if(worker.job==='farmer')return world.buildings.some(b=>b.type==='plot'||b.type==='orchard')?'Working the land':'Needs a plot or orchard';
   if(worker.job==='miller')return !world.buildings.some(b=>b.type==='windmill')?'Needs a windmill':world.resources.wheat<3?'Waiting for wheat':'Milling';
   if(worker.job==='baker')return !world.buildings.some(b=>b.type==='bakery')?'Needs a bakery':world.resources.flour<2?'Waiting for flour':'Baking';
@@ -114,6 +116,7 @@ function renderWorkers(){
   const picker=$('autocrop');picker.value=world.autoCrop;
   $('worker-summary').textContent=`${world.workers.length} residents · ${world.workers.filter(w=>w.job!=='idle').length} employed · up to ${Math.round(MAX_OFFLINE_MS/3600000)}h of offline progress`;
   $('workers-empty').hidden=world.workers.length>0;
+  if(selectedRoute&&!world.workers.some(w=>w.id===selectedRoute))selectedRoute=null;
   for(const worker of world.workers){
     const card=document.createElement('div');card.className='worker-card';
     const portrait=document.createElement('span');portrait.className='worker-portrait';portrait.textContent=JOBS[worker.job].icon;
@@ -125,7 +128,17 @@ function renderWorkers(){
     for(const [id,job] of Object.entries(JOBS)){const option=document.createElement('option');option.value=id;option.textContent=job.icon+' '+job.name;select.append(option)}
     select.value=worker.job;
     select.addEventListener('change',()=>{const err=assignWorker(game[group],worker.id,select.value,Date.now());if(err)return showToast(err);commit(select.value==='idle'?`${worker.name} is taking a well-earned break.`:`${worker.name} has started working as a ${JOBS[select.value].name.toLowerCase()}.`)});
-    card.append(portrait,name,select);list.append(card);
+    card.append(portrait,name,select);
+    const plan=planWorkerRoute(game,group,worker);
+    if(plan){
+      const btn=document.createElement('button');btn.className='route-button'+(selectedRoute===worker.id?' selected':'');
+      btn.type='button';btn.setAttribute('aria-pressed',String(selectedRoute===worker.id));
+      const ms=workInterval(world,worker,JOBS[worker.job].ms,plan);
+      btn.textContent=`${selectedRoute===worker.id?'✦ ':'↗ '}Show walking route · ${(ms/1000).toFixed(0)}s cycle`;
+      btn.onclick=()=>{selectedRoute=selectedRoute===worker.id?null:worker.id;render()};
+      card.append(btn);
+    }
+    list.append(card);
   }
   const journal=$('worker-journal');journal.replaceChildren();
   for(const activity of (world.workLog.length?world.workLog.slice(0,4):[{text:'Your villagers are settling in. Assign them a job to get started.'}])){
@@ -151,6 +164,15 @@ function renderGoals(){
     card.append(button);el.append(card);
   }
 }
+function renderLogistics(){
+  const w=game[group],summary=roadSummary(game,group);
+  $('road-total').textContent=String(summary.roads);
+  $('road-users').textContent=`${summary.roadUsers} / ${summary.working}`;
+  $('route-total').textContent=`${summary.reachable} / ${summary.working}`;
+  $('logistics-hint').textContent=summary.roads
+    ? 'Roads lower travel time for villagers who use them. Open a worker route to find a useful place for the next path tile.'
+    : 'Start by placing Stone Paths between your cottage and gardens. Roads are optional, but they speed up automated work.';
+}
 function render(){const w=game[group],n=game[other(group)],effects=received(game,group);
   $('world-name').textContent=w.name;$('neighbor-name').textContent=n.name;
   $('sky-badge').textContent=effects.sun?'☼ Borrowed sunshine':'☾ Gentle twilight';
@@ -164,9 +186,9 @@ function render(){const w=game[group],n=game[other(group)],effects=received(game
   $('turn-mirror').querySelector('small').textContent=w.mirror===2?'Moonbeam is aligned':'Angle '+(w.mirror+1)+'/3 · redirect moonlight';
   $('events').replaceChildren();const recent=game.events.length?game.events.slice(0,5):[{message:'Nothing has stirred the universe yet. Be the first.'}];
   for(const e of recent){const div=document.createElement('div');div.className='event';div.textContent=e.message;if(e.at){const time=document.createElement('time');time.textContent=new Date(e.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});div.append(time)}$('events').append(div)}
-  renderCatalog();renderProduction();renderWorkers();renderGoals();view?.refresh(game,group,{mode,buildType:chosenBuild,rotation,selectedMove});
+  renderCatalog();renderProduction();renderWorkers();renderLogistics();renderGoals();view?.refresh(game,group,{mode,buildType:chosenBuild,rotation,selectedMove});view?.highlightRoute(selectedRoute);
 }
-for(const button of document.querySelectorAll('[data-group]'))button.addEventListener('click',()=>{group=button.dataset.group;selectedMove=null;zoomed=false;view?.setCamera(false);render();showToast(`You entered ${game[group].name}.`)});
+for(const button of document.querySelectorAll('[data-group]'))button.addEventListener('click',()=>{group=button.dataset.group;selectedMove=null;selectedRoute=null;zoomed=false;view?.setCamera(false);render();showToast(`You entered ${game[group].name}.`)});
 for(const button of document.querySelectorAll('[data-mode]'))button.addEventListener('click',()=>setMode(button.dataset.mode));
 $('autocrop').onchange=()=>{const err=setAutoCrop(game[group],$('autocrop').value);if(err)return showToast(err);commit('Your farmers will now grow '+CROP[game[group].autoCrop].name+'.')};
 $('toggle-lamp').onclick=toggleLamp;$('turn-mirror').onclick=turnMirror;$('send-seed').onclick=giftSeed;

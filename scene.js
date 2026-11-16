@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {within, received, growth, findAt, BUILD, canAfford, orchardReady} from './core.js';
+import {planWorkerRoute} from './routing.js';
 
 // Tiny procedural diorama: all models are built from geometry, no asset downloads.
 export function createScene(mount, callbacks){
@@ -45,6 +46,8 @@ export function createScene(mount, callbacks){
   const models=new THREE.Group();scene.add(models);
   const residents=new THREE.Group();scene.add(residents);
   const crops=[],turbines=[],chimneys=[],orchards=[],walkers=[];
+  const routeOverlay=new THREE.Group();scene.add(routeOverlay);
+  let highlightedWorker=null;
   let currentGame=null,currentId='a',currentOptions={mode:'explore',buildType:'plot',rotation:0,selectedMove:null},hoverHit=null;
   const preview=new THREE.Group();scene.add(preview);
   const previewMaterial=new THREE.MeshBasicMaterial({color:'#b4e7b0',transparent:true,opacity:.43,depthWrite:false});
@@ -186,38 +189,56 @@ export function createScene(mount, callbacks){
     }
     mark(g,{kind:'tile',x:b.x,z:b.z});
   }
-  function rebuildVillagers(world){
+  function rebuildVillagers(world,game,id){
     while(residents.children.length){const old=residents.children[0];residents.remove(old);old.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose()}})}
     walkers.length=0;
-    const workers=(world.workers||[]).slice(0,16);
+    const workers=(world.workers||[]).slice(0,18);
     for(let i=0;i<workers.length;i++){
       const worker=workers[i];
       const home=world.buildings.find(b=>b.id===worker.homeId&&b.type==='cottage');
       if(!home)continue;
-      const available=types=>world.buildings.filter(b=>types.includes(b.type));
-      const targets=worker.job==='farmer'?available(['plot','orchard']):
-        worker.job==='miller'?available(['windmill']):
-        worker.job==='baker'?available(['bakery']):
-        worker.job==='forager'?[{x:-3.2,z:2.1},{x:3.1,z:2.1}]:[home];
-      const dest=targets.length?targets[i%targets.length]:home;
+      const plan=planWorkerRoute(game,id,worker,Date.now());
+      const saved=worker.trip?.points;
+      const validSaved=Array.isArray(saved)&&saved.length>1&&saved.every((p,j)=>within(p.x,p.z)&&(j===0||j===saved.length-1||!findAt(world,p.x,p.z)||findAt(world,p.x,p.z).type==='path'));
+      const path=validSaved?saved:(plan?.route.points || [{x:home.x,z:home.z}]);
       const v=new THREE.Group();v.position.set(home.x,.22,home.z);residents.add(v);
       const colors={farmer:'#a1bea0',miller:'#d6c49e',baker:'#e2a7a8',forager:'#95bccc',idle:'#c4b5d4'};
       const hats={farmer:'#779d66',miller:'#b2a17a',baker:'#f4ece0',forager:'#7095a1',idle:'#a56d8e'};
       cyl(v,.11,.095,.31,[0,.31,0],colors[worker.job]||colors.idle,9);
       ball(v,.105,[0,.58,0],i%2?'#9d785e':'#d9ae86');
-      const hat=cone(v,worker.job==='baker'?.19:.155,worker.job==='baker'?.19:.12,[0,.75,0],hats[worker.job]||hats.idle,8);
-      if(worker.job==='farmer'){
-        const brim=cyl(v,.18,.18,.025,[0,.69,0],'#d3c091');brim.castShadow=false;
-      }
-      if(worker.job==='forager')box(v,[.18,.24,.14],[.17,.31,-.10],'#8f694c');
-      if(worker.job==='miller')ball(v,.10,[.16,.28,0],'#e8d69d');
+      cone(v,worker.job==='baker'?.19:.155,worker.job==='baker'?.19:.12,[0,.75,0],hats[worker.job]||hats.idle,8);
+      if(worker.job==='farmer'){const brim=cyl(v,.18,.18,.025,[0,.69,0],'#d3c091');brim.castShadow=false;}
+      const parcel=box(v,[.19,.17,.18],[.20,.32,.05],worker.job==='miller'?'#e7d6a0':worker.job==='baker'?'#dfa375':'#a47c55');
+      box(parcel,[.17,.018,.02],[0,.11,0],'#f3e1b7');
       for(const side of [-1,1])ball(v,.011,[side*.045,.59,.093],'#373d48');
       const leg1=cyl(v,.034,.04,.18,[-.065,.08,0],'#695c6b',6);
       const leg2=cyl(v,.034,.04,.18,[.065,.08,0],'#695c6b',6);
       v.traverse(o=>{if(o.isMesh)o.castShadow=false});
-      walkers.push({v,leg1,leg2,home,dest,phase:i*1.8+Math.PI*.2,speed:.22+(i%3)*.07,job:worker.job});
+      walkers.push({v,leg1,leg2,parcel,worker,path,home,phase:i*1.8+Math.PI*.2,job:worker.job});
+    }
+    drawHighlightedRoute();
+  }
+  function drawHighlightedRoute(){
+    while(routeOverlay.children.length){const old=routeOverlay.children[0];routeOverlay.remove(old);old.geometry?.dispose();old.material?.dispose();}
+    const walker=walkers.find(w=>w.worker.id===highlightedWorker);
+    if(!walker||walker.path.length<2)return;
+    const points=walker.path.map(p=>new THREE.Vector3(p.x,.28,p.z));
+    const geometry=new THREE.BufferGeometry().setFromPoints(points);
+    const material=new THREE.LineDashedMaterial({color:'#ffe2a5',dashSize:.19,gapSize:.12,opacity:.96,transparent:true,depthTest:false});
+    const line=new THREE.Line(geometry,material);line.computeLineDistances();line.renderOrder=4;routeOverlay.add(line);
+    for(const point of [points[0],points[points.length-1]]){
+      const ring=new THREE.Mesh(new THREE.RingGeometry(.25,.32,24),new THREE.MeshBasicMaterial({color:'#ffe2a5',side:THREE.DoubleSide,transparent:true,opacity:.8,depthTest:false}));
+      ring.rotation.x=-Math.PI/2;ring.position.set(point.x,.28,point.z);ring.renderOrder=4;routeOverlay.add(ring);
     }
   }
+  /** Visual position follows the same grid route used to calculate job travel time. */
+  function followRoute(path,progress){
+    if(path.length<2)return {x:path[0]?.x??0,z:path[0]?.z??0};
+    const step=Math.min(path.length-1,Math.max(0,progress)*(path.length-1));
+    const i=Math.min(path.length-2,Math.floor(step)),f=step-i;
+    return {x:path[i].x+(path[i+1].x-path[i].x)*f,z:path[i].z+(path[i+1].z-path[i].z)*f};
+  }
+
   const raycaster=new THREE.Raycaster();const mouse=new THREE.Vector2();let start=null;
   function hit(e){const b=renderer.domElement.getBoundingClientRect();mouse.x=(e.clientX-b.left)/b.width*2-1;mouse.y=-(e.clientY-b.top)/b.height*2+1;raycaster.setFromCamera(mouse,camera);
     for(const match of raycaster.intersectObjects([models,grove,lamp,mirror,grid],true)){
@@ -241,7 +262,7 @@ export function createScene(mount, callbacks){
     crops.length=0;turbines.length=0;chimneys.length=0;orchards.length=0;
     while(models.children.length){const g=models.children[0];models.remove(g);g.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose()}})}
     for(const b of game[id].buildings)drawBuilding(b,game,id,Date.now());
-    rebuildVillagers(game[id]);
+    rebuildVillagers(game[id],game,id);
     const incoming=received(game,id);hemi.intensity=incoming.sun?2.9:2.2;sun.intensity=incoming.sun?3:1.7;
     sun.color.set(incoming.sun?'#ffe0a1':'#c1d4fb');
     lampLight.intensity=game[id].lamp?6:0;lampBulb.material.emissive.set(game[id].lamp?'#ffbd65':'#000000');
@@ -284,15 +305,31 @@ export function createScene(mount, callbacks){
       o.fruits.forEach((f,i)=>{f.visible=ready;f.scale.setScalar(ready?1+.08*Math.sin(t*2.5+i):1)});
     }
     for(const walker of walkers){
-      const a=walker.home,b=walker.dest,phase=t*walker.speed+walker.phase;
-      const x=(Math.sin(phase)+1)/2;
-      const eased=x*x*(3-2*x);
-      walker.v.position.set(a.x+(b.x-a.x)*eased,.19+Math.abs(Math.sin(t*5+walker.phase))*.035,a.z+(b.z-a.z)*eased);
-      walker.v.rotation.y=Math.atan2((b.x-a.x)*Math.cos(phase),(b.z-a.z)*Math.cos(phase));
+      const {worker,path}=walker;
+      const now=Date.now();
+      let progress=0,returning=false;
+      if(worker.job==='idle'||path.length<2){
+        walker.v.position.set(walker.home.x+Math.sin(t*.32+walker.phase)*.25,.19,walker.home.z+Math.cos(t*.4+walker.phase)*.25);
+        walker.parcel.visible=false;
+      }else{
+        const trip=worker.trip;
+        // Old save files lack trips: keep residents moving gently until their next scheduled job.
+        const from=Number.isFinite(trip?.startedAt)?trip.startedAt:worker.nextAt-16000;
+        const until=Number.isFinite(trip?.endsAt)?trip.endsAt:worker.nextAt;
+        const phase=Math.max(0,Math.min(1,(now-from)/Math.max(1000,until-from)));
+        returning=phase>=.5;
+        const u=returning?(1-phase)*2:phase*2;
+        const pos=followRoute(path,u);
+        const upcoming=followRoute(path,Math.max(0,Math.min(1,u+(returning?-.015:.015))));
+        walker.v.position.set(pos.x,.19+Math.abs(Math.sin(t*5+walker.phase))*.035,pos.z);
+        const deltaX=upcoming.x-pos.x,deltaZ=upcoming.z-pos.z;
+        if(Math.hypot(deltaX,deltaZ)>.0001)walker.v.rotation.y=Math.atan2(deltaX,deltaZ);
+        walker.parcel.visible=returning;
+      }
       walker.leg1.rotation.x=Math.sin(t*6+walker.phase)*.45;
       walker.leg2.rotation.x=-Math.sin(t*6+walker.phase)*.45;
     }
     controls.update();renderer.render(scene,camera);
   }tick();
-  return {refresh,setCamera,dispose(){cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();renderer.dispose();renderer.domElement.remove()}};
+  return {refresh,setCamera,highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();renderer.dispose();renderer.domElement.remove()}};
 }

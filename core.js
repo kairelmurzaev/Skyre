@@ -11,7 +11,7 @@ export const BUILD = {
   windmill: {name:'Windmill',cost:{wood:18,stone:10},icon:'🌾',description:'Grind wheat into flour'},
   bakery: {name:'Bakery',cost:{wood:15,stone:12},icon:'🥖',description:'Bake bread from flour'},
   well: {name:'Moonwell',cost:{wood:7,stone:9},icon:'💧',description:'A gentle light for your island'},
-  path: {name:'Stone Path',cost:{stone:1},icon:'◻',description:'Connect your buildings'},
+  path: {name:'Stone Path',cost:{stone:1},icon:'◻',description:'Shorten worker travel time between homes and workplaces'},
   orchard: {name:'Dream Orchard',cost:{wood:10,stone:6},icon:'🌳',description:'Grows fruit and magical seeds every 90 seconds'}
 };
 const names={a:'Amber Hollow',b:'Moon Garden'};
@@ -141,7 +141,8 @@ export const GOALS=[
   {id:'village',name:'A village takes shape',description:'Have at least 6 buildings',reward:{stone:12,coins:8}},
   {id:'bakery',name:'Bread for everyone',description:'Build a windmill and bakery',reward:{wood:12,coins:12}},
   {id:'neighbors',name:'Across the glass',description:'Send a seed to another world',reward:{seeds:6,coins:8}},
-  {id:'working',name:'Helping hands',description:'Let villagers complete 10 useful jobs',reward:{wood:10,stone:10,coins:14}}
+  {id:'working',name:'Helping hands',description:'Let villagers complete 10 useful jobs',reward:{wood:10,stone:10,coins:14}},
+  {id:'pathways',name:'Little footsteps',description:'Build 4 Stone Paths around your village',reward:{stone:7,coins:10}}
 ];
 export function goalReady(world,id){
   if(id==='harvest')return (world.progress?.harvests||0)>=1;
@@ -149,6 +150,7 @@ export function goalReady(world,id){
   if(id==='bakery')return ['windmill','bakery'].every(t=>world.buildings.some(b=>b.type===t));
   if(id==='neighbors')return (world.progress?.gifts||0)>=1;
   if(id==='working')return Object.values(world.workStats||{}).reduce((sum,n)=>sum+(Number(n)||0),0)>=10;
+  if(id==='pathways')return world.buildings.filter(b=>b.type==='path').length>=4;
   return false;
 }
 export function claimGoal(world,id){
