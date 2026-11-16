@@ -4,7 +4,7 @@ import {received, growth, findAt, BUILD, canAfford, orchardReady} from './core.j
 import {LAND_STAGES,LANDSCAPE,MAX_COORD,islandStage,withinWorld,walkableTile,buildableTile,decorAt} from './terrain.js';
 import {buildingStock} from './logistics.js';
 import {planWorkerRoute} from './routing.js';
-import {createCharacterFactory} from './characters.js';
+import {createRiggedCharacterFactory} from './rigged-characters.js';
 
 // Tiny procedural diorama: all models are built from geometry, no asset downloads.
 export function createScene(mount, callbacks){
@@ -17,7 +17,7 @@ export function createScene(mount, callbacks){
   mount.append(renderer.domElement);
   const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
   controls.target.set(0,.15,0);controls.minDistance=3;controls.maxDistance=36;controls.maxPolarAngle=1.49;
-  controls.enablePan=false;
+  controls.enablePan=false;controls.minDistance=1.35;
   const hemi=new THREE.HemisphereLight('#c6eaff','#394657',2.2);scene.add(hemi);
   const sun=new THREE.DirectionalLight('#ffe4b6',2.3);sun.position.set(-6,12,8);sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-11;sun.shadow.camera.right=11;sun.shadow.camera.top=11;sun.shadow.camera.bottom=-11;scene.add(sun);
@@ -49,7 +49,16 @@ export function createScene(mount, callbacks){
   const models=new THREE.Group();scene.add(models);
   const landscapeModels=new THREE.Group();scene.add(landscapeModels);
   const residents=new THREE.Group();scene.add(residents);
-  const characters=createCharacterFactory(),residentCache=new Map();
+  const characters=createRiggedCharacterFactory(),residentCache=new Map();
+  let sceneDisposed=false;
+  characters.ready.then(loaded=>{
+    if(sceneDisposed||!loaded||!currentGame)return;
+    // Replace the temporary procedural preview with one cloned skinned rig per
+    // resident. Workers' jobs, identity, position and routing stay unchanged.
+    for(const rig of residentCache.values())characters.release(rig);
+    residentCache.clear();
+    rebuildVillagers(currentGame[currentId],currentGame,currentId);
+  });
   const crops=[],turbines=[],chimneys=[],orchards=[],walkers=[];
   const routeOverlay=new THREE.Group();scene.add(routeOverlay);
   let highlightedWorker=null;
@@ -245,7 +254,9 @@ export function createScene(mount, callbacks){
     residents.clear();
     walkers.length=0;
     const living=new Set([...game.a.workers||[],...game.b.workers||[]].map(w=>w.id));
-    for(const [key] of residentCache)if(!living.has(key))residentCache.delete(key);
+    for(const [key,rig] of residentCache)if(!living.has(key)){
+      characters.release(rig);residentCache.delete(key);
+    }
     const roster=(world.workers||[]).slice(0,18);
     for(let i=0;i<roster.length;i++){
       const worker=roster[i];
@@ -256,7 +267,10 @@ export function createScene(mount, callbacks){
       const validSaved=Array.isArray(saved)&&saved.length>1&&saved.every((p,j)=>walkableTile(world,p.x,p.z)&&(j===0||j===saved.length-1||!findAt(world,p.x,p.z)||['path','cottage','warehouse'].includes(findAt(world,p.x,p.z).type)||[worker.trip?.delivery?.sourceId,worker.trip?.delivery?.destId].includes(findAt(world,p.x,p.z).id)));
       const path=validSaved?saved:(plan?.route.points||[{x:home.x,z:home.z}]);
       let rig=residentCache.get(worker.id);
-      if(!rig||rig.job!==worker.job){rig=characters.create(worker);residentCache.set(worker.id,rig);}
+      if(!rig||rig.job!==worker.job){
+        if(rig)characters.release(rig);
+        rig=characters.create(worker);residentCache.set(worker.id,rig);
+      }
       rig.root.position.set(home.x,.19,home.z);residents.add(rig.root);
       walkers.push({v:rig.root,rig,worker,path,home,phase:i*1.8+Math.PI*.2,job:worker.job});
     }
@@ -339,7 +353,7 @@ export function createScene(mount, callbacks){
     if(!selected)return false;
     const pos=selected.v.position;
     controls.target.set(pos.x,pos.y+.61,pos.z);
-    camera.position.set(pos.x+2.5,pos.y+1.95,pos.z+3.0);
+    camera.position.set(pos.x+1.15,pos.y+1.65,pos.z+1.65);
     controls.update();
     return true;
   }
@@ -370,8 +384,9 @@ export function createScene(mount, callbacks){
     for(const walker of walkers){
       const {worker,path}=walker;
       const now=Date.now();
-      let returning=false,carrying=false,walking=false;
+      let returning=false,carrying=false,walking=false,working=false;
       if(worker.job==='idle'||path.length<2){
+        working=worker.job!=='idle';
         walker.v.position.set(walker.home.x+Math.sin(t*.32+walker.phase)*.25,.19,walker.home.z+Math.cos(t*.4+walker.phase)*.25);
         carrying=false;
       }else{
@@ -389,10 +404,13 @@ export function createScene(mount, callbacks){
         const deltaX=upcoming.x-pos.x,deltaZ=upcoming.z-pos.z;
         if(Math.hypot(deltaX,deltaZ)>.0001)walker.v.rotation.y=Math.atan2(deltaX,deltaZ);
         carrying=worker.job==='hauler'?(phase>.20&&phase<.8):returning;
+        if(worker.job!=='hauler'&&phase>.46&&phase<.55){walking=false;working=true;carrying=false;}
       }
-      characters.animate(walker.rig,t,walker.phase,{walking,carrying});
+      characters.animate(walker.rig,t,walker.phase,{walking,carrying,working});
     }
     controls.update();renderer.render(scene,camera);
   }tick();
-  return {refresh,setCamera,focusVillager,highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();characters.dispose();renderer.dispose();renderer.domElement.remove()}};
+  return {refresh,setCamera,focusVillager,highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){sceneDisposed=true;cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();
+    for(const rig of residentCache.values())characters.release(rig);
+    residentCache.clear();characters.dispose();renderer.dispose();renderer.domElement.remove()}};
 }

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#142b37"><title>Skyre — Character Studio</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<style>
+:root{color-scheme:dark;font-family:ui-rounded,system-ui,-apple-system,sans-serif;background:#142834;color:#f4e8d1}
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:flex;flex-direction:column}
+header{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #ffffff18;background:#162d39}
+a{color:#d5e9c1;text-decoration:none}h1{font-size:clamp(1rem,4vw,1.5rem);margin:0;font-weight:650}
+main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(225px,280px);min-height:0;max-width:1350px;width:100%;margin:auto}
+#stage{height:calc(100dvh - 65px);min-height:420px;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 20%,#587e89 0%,#203e4b 65%,#152e3b 100%);touch-action:none}
+#stage canvas{display:block;width:100%;height:100%}#status{position:absolute;left:16px;bottom:18px;background:#15232cba;padding:10px 14px;border-radius:12px;font-size:13px;pointer-events:none}
+aside{border-left:1px solid #ffffff20;background:#1c3440;padding:20px;display:flex;flex-direction:column;gap:15px}
+small{color:#b3c9c7}label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:650}
+select,button{padding:13px;border:1px solid #ffffff25;background:#2a4c58;color:#f7eadd;border-radius:12px;font-size:15px;width:100%}button{cursor:pointer;background:#a1bd90;color:#162d24;font-weight:750}
+button:active{transform:translateY(1px)}p{font-size:13px;line-height:1.7;color:#c4d6d2}#note{padding:12px;background:#ffffff0d;border-radius:12px}
+@media(max-width:680px){main{display:flex;flex-direction:column}#stage{height:58dvh;min-height:340px;flex:none}aside{border:0;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}aside>p,aside>#note{grid-column:1/-1}h1{font-size:1rem}}
+</style></head><body>
+<header><h1>✳ Skyre · Character Studio</h1><a href="./index.html">Return to island</a></header>
+<main>
+<div id="stage"><div id="status" aria-live="polite">Loading the rigged 3D model…</div></div>
+<aside>
+<label>Villager identity <select id="look"></select></label>
+<label>Uniform <select id="job"><option value="idle">Villager</option><option value="farmer">Farmer</option><option value="forager">Forager</option><option value="hauler">Hauler</option><option value="miller">Miller</option><option value="baker">Baker</option></select></label>
+<label>Animation <select id="animation"><option>Idle</option><option>Walk</option><option>Carry</option><option>Work</option><option>Wave</option></select></label>
+<button id="fullscreen">Fullscreen preview</button>
+<div id="note"><small>Drag to rotate · Pinch to zoom</small><p>These are the actual skinned game models with independent bone rigs and baked animation clips—not a rendered concept illustration.</p></div>
+</aside>
+</main><script type="module" src="./character-studio.js"></script>
+</body></html>

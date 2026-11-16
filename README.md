@@ -1,4 +1,13 @@
-# Someone Else’s Sky — v0.8, Living Faces
+# Someone Else's Sky — v0.9, Real Character Rigs
+
+**New visual milestone:** villagers now use a real glTF 2.0 skinned model with 17 bones, embedded painterly cloth/leather/hair textures, five baked animations (Idle, Walk, Carry, Work, Wave), eight stable appearances and job-dependent hats/aprons. The file is cloned with independent skeletons and played through `AnimationMixer`; jobs and roads still drive movement. In case it cannot load, the earlier geometry-based figure remains as a fallback.
+
+Try the **[Character Studio](character-studio.html)** to inspect all eight villagers, change uniforms, play animations and rotate the camera on your phone.
+
+This is an original, improved interpretation of the approved concept illustration, **not a literal conversion of the 2D image into a studio-quality sculpt**. See [docs/RIGGING.md](docs/RIGGING.md) for the asset-generation pipeline and remaining visual quality limitations.
+
+The game works in local mode (including Netlify previews). Server multiplayer remains optional and needs a real deployment later.
+
 
 A cozy 3D farming/building game where Telegram groups share **real persistent worlds** and can influence a paired group’s sunlight, moonlight and seeds. The farming, local inventories, village workers, roads, hauling and automation from v0.5 remain.
 
