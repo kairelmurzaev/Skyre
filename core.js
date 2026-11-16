@@ -11,7 +11,8 @@ export const BUILD = {
   windmill: {name:'Windmill',cost:{wood:18,stone:10},icon:'🌾',description:'Grind wheat into flour'},
   bakery: {name:'Bakery',cost:{wood:15,stone:12},icon:'🥖',description:'Bake bread from flour'},
   well: {name:'Moonwell',cost:{wood:7,stone:9},icon:'💧',description:'A gentle light for your island'},
-  path: {name:'Stone Path',cost:{stone:1},icon:'◻',description:'Connect your buildings'}
+  path: {name:'Stone Path',cost:{stone:1},icon:'◻',description:'Connect your buildings'},
+  orchard: {name:'Dream Orchard',cost:{wood:10,stone:6},icon:'🌳',description:'Grows fruit and magical seeds every 90 seconds'}
 };
 const names={a:'Amber Hollow',b:'Moon Garden'};
 export const other=id=>id==='a'?'b':'a';
@@ -23,13 +24,23 @@ const initialWorld=(id)=>({
     {id:id+'-field2',type:'plot',x:-1,z:0,rotation:0,crop:null},
     {id:id+'-field3',type:'plot',x:-2,z:1,rotation:0,crop:null}
   ],
-  lamp:false,mirror:0,harvestedAt:{wood:0,stone:0},nextId:1
+  lamp:false,mirror:0,harvestedAt:{wood:0,stone:0},nextId:1,progress:{harvests:0,gifts:0,claimed:[]}
 });
 export const newGame=()=>({version:1,a:initialWorld('a'),b:initialWorld('b'),events:[]});
 export function loadGame(storage){
   try {
     const saved=JSON.parse(storage.getItem(SAVE_KEY));
-    if(saved && saved.version===1 && ['a','b'].every(id=>saved[id]&&Array.isArray(saved[id].buildings)&&saved[id].resources))return saved;
+    if(saved && saved.version===1 && ['a','b'].every(id=>saved[id]&&Array.isArray(saved[id].buildings)&&saved[id].resources)){
+      // Older milestone-1 saves remain valid when new progress fields are added.
+      for(const id of ['a','b']){
+        const world=saved[id];
+        world.progress={harvests:0,gifts:0,claimed:[],...world.progress};
+        if(!Array.isArray(world.progress.claimed))world.progress.claimed=[];
+        if(!Number.isInteger(world.nextId))world.nextId=world.buildings.length+1;
+      }
+      if(!Array.isArray(saved.events))saved.events=[];
+      return saved;
+    }
   }catch{}
   return newGame();
 }
@@ -43,8 +54,22 @@ export function buildAt(world,type,x,z,rotation=0){
   if(!within(x,z))return 'Choose a tile on the island.';
   if(findAt(world,x,z))return 'That tile is already occupied.';
   if(!spend(world,BUILD[type].cost))return 'You need more building materials.';
-  world.buildings.push({id:'building-'+(world.nextId++),type,x,z,rotation:rotation%4,crop:null});
+  world.buildings.push({id:'building-'+(world.nextId++),type,x,z,rotation:((rotation%4)+4)%4,crop:null,placedAt:Date.now()});
   return null;
+}
+export function moveAt(world,fromX,fromZ,toX,toZ){
+  const building=findAt(world,fromX,fromZ);
+  if(!building)return 'Choose a building to move first.';
+  if(!within(toX,toZ))return 'Choose a tile on the island.';
+  if(fromX===toX&&fromZ===toZ)return 'Choose a different destination tile.';
+  if(findAt(world,toX,toZ))return 'That tile is already occupied.';
+  building.x=toX;building.z=toZ;
+  return null;
+}
+export function rotateAt(world,x,z){
+  const building=findAt(world,x,z);
+  if(!building)return 'Choose an existing building.';
+  building.rotation=((building.rotation||0)+1)%4;return null;
 }
 export function removeAt(world,x,z){
   const b=findAt(world,x,z);if(!b)return 'There is no building here.';
@@ -73,7 +98,7 @@ export function harvest(game,id,x,z,now=Date.now()){
   for(const [key,n] of Object.entries(CROP[b.crop.kind].yield))w.resources[key]=(w.resources[key]||0)+n;
   // A correctly aligned neighbor mirror makes the harvest more valuable, never mandatory.
   if(received(game,id).moonbeam)w.resources.coins+=2;
-  b.crop=null;return null;
+  b.crop=null;w.progress??={harvests:0,gifts:0,claimed:[]};w.progress.harvests++;return null;
 }
 export function gather(world,kind,now=Date.now()){
   if(!['wood','stone'].includes(kind))return 'Unknown resource.';
@@ -94,6 +119,42 @@ export function processBuilding(world,type){
 }
 export function sendSeed(game,id){
   if(!spend(game[id],{seeds:1}))return 'You need a seed to share.';
-  game[other(id)].resources.seeds+=2;return null;
+  game[other(id)].resources.seeds+=2;
+  game[id].progress??={harvests:0,gifts:0,claimed:[]};game[id].progress.gifts++;
+  return null;
+}
+export const ORCHARD_MS=90000;
+export function orchardReady(building,now=Date.now()){
+  return building?.type==='orchard'&&now-(building.harvestedAt??building.placedAt??now)>=ORCHARD_MS;
+}
+export function harvestOrchard(world,x,z,now=Date.now()){
+  const b=findAt(world,x,z);
+  if(!b||b.type!=='orchard')return 'Choose a Dream Orchard.';
+  if(!orchardReady(b,now))return 'The orchard needs more time to grow fruit.';
+  b.harvestedAt=now;
+  world.resources.food+=4;world.resources.seeds+=1;
+  return null;
+}
+export const GOALS=[
+  {id:'harvest',name:'A gentle harvest',description:'Harvest your first crop',reward:{wood:8,seeds:3}},
+  {id:'village',name:'A village takes shape',description:'Have at least 6 buildings',reward:{stone:12,coins:8}},
+  {id:'bakery',name:'Bread for everyone',description:'Build a windmill and bakery',reward:{wood:12,coins:12}},
+  {id:'neighbors',name:'Across the glass',description:'Send a seed to another world',reward:{seeds:6,coins:8}}
+];
+export function goalReady(world,id){
+  if(id==='harvest')return (world.progress?.harvests||0)>=1;
+  if(id==='village')return world.buildings.length>=6;
+  if(id==='bakery')return ['windmill','bakery'].every(t=>world.buildings.some(b=>b.type===t));
+  if(id==='neighbors')return (world.progress?.gifts||0)>=1;
+  return false;
+}
+export function claimGoal(world,id){
+  const goal=GOALS.find(g=>g.id===id);
+  if(!goal)return 'Unknown village goal.';
+  world.progress??={harvests:0,gifts:0,claimed:[]};
+  if(world.progress.claimed.includes(id))return 'You already claimed this reward.';
+  if(!goalReady(world,id))return 'This village goal is not finished yet.';
+  for(const [name,n] of Object.entries(goal.reward))world.resources[name]=(world.resources[name]||0)+n;
+  world.progress.claimed.push(id);return null;
 }
 export function record(game,message){game.events.unshift({id:Date.now()+'-'+Math.random().toString(36).slice(2),message,at:Date.now()});game.events=game.events.slice(0,20);}

@@ -8,23 +8,24 @@
 <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
 </head><body>
 <div class="shell">
-  <header class="topbar"><div class="brandmark">✳</div><div class="brand"><small>AN INTERTWINED UNIVERSE</small><h1>someone else's <em>sky.</em></h1></div><span class="tag">LIVING WORLDS · ALPHA</span></header>
+  <header class="topbar"><div class="brandmark">✳</div><div class="brand"><small>AN INTERTWINED UNIVERSE</small><h1>someone else's <em>sky.</em></h1></div><span class="tag">LIVING WORLDS · V0.2</span></header>
   <div class="heading"><div><span class="eyebrow">✦ YOUR LITTLE UNIVERSE</span><h2>Make a place worth <em>coming home to.</em></h2><p>Plant a field. Build a village. Light up someone else's sky.</p></div><div class="group-picker"><span>DEMO GROUP</span><div class="toggle"><button data-group="a" class="active">A</button><button data-group="b">B</button></div></div></div>
   <div class="layout">
     <main class="game-column">
       <section class="scene-card"><div class="scene-head"><div><small>YOUR ISLAND</small><strong id="world-name">Amber Hollow</strong></div><div class="sky-badge" id="sky-badge">☾ Gentle twilight</div></div>
       <div class="viewport" id="scene"><div class="scene-overlay top-left">✧ <span id="scene-hint">Explore: tap a tree or rock to gather</span></div><div class="scene-overlay bottom-left">Drag to orbit · Scroll / pinch to zoom</div><button class="camera-btn" id="camera-btn">⌕ Zoom in</button></div>
-      <div class="resources" id="resources" aria-label="Inventory"></div></section>
+      <div class="resources" id="resources" aria-label="Inventory"></div><div class="village-stats" id="villager-count">2 villagers wandering · 4 buildings</div></section>
       <section class="workshop"><div class="workshop-top"><div><span class="eyebrow">THE WORKBENCH</span><h3>Make something wonderful.</h3></div><div class="rotate-hint" id="rotate-hint">R to rotate</div></div>
-      <div class="tabs" role="group" aria-label="Choose a tool"><button class="active" data-mode="explore">✥ Explore</button><button data-mode="farm">❀ Farm</button><button data-mode="build">⌂ Build</button><button data-mode="demolish">♻ Remove</button></div>
+      <div class="tabs" role="group" aria-label="Choose a tool"><button class="active" data-mode="explore">✥ Explore</button><button data-mode="farm">❀ Farm</button><button data-mode="build">⌂ Build</button><button data-mode="move">↔ Move</button><button data-mode="demolish">♻ Remove</button></div>
       <div class="catalog" id="catalog"></div><div id="tool-help" class="tool-help"></div></section>
       <section class="workshop"><div class="workshop-top"><div><span class="eyebrow">FROM FIELD TO HOME</span><h3>Craft &amp; produce</h3></div></div><div id="production" class="production"></div></section>
     </main>
-    <aside class="side-column"><section class="panel"><span class="eyebrow">SOMEWHERE, SOMEONE ELSE</span><h3>The other side of your sky</h3><p>Your desk controls the weather over another group's island. They control yours.</p><div class="neighbor"><div class="orb">✺</div><div><small>CONNECTED TO</small><strong id="neighbor-name">Moon Garden</strong><span id="neighbor-details">A tiny world inside your globe</span></div></div>
+    <aside class="side-column"><section class="panel"><span class="eyebrow">SOMEWHERE, SOMEONE ELSE</span><h3>The other side of your sky</h3><p>Your lamp still controls another group's weather. And their light changes how your crops grow.</p><div class="neighbor"><div class="orb">✺</div><div><small>CONNECTED TO</small><strong id="neighbor-name">Moon Garden</strong><span id="neighbor-details">A tiny world inside your globe</span></div></div>
     <div class="neighbor-actions"><button id="toggle-lamp"><span>☼</span><div><b>Desk lamp</b><small>Give them sunlight</small></div></button><button id="turn-mirror"><span>☾</span><div><b>Moon mirror</b><small>Align their moonbeam</small></div></button><button id="send-seed"><span>✧</span><div><b>Send a seed</b><small>Gift two seeds to their farm</small></div></button></div>
     <div class="effect-note" id="effect-note"></div></section>
+    <section class="panel"><span class="eyebrow">SMALL DREAMS, BIG VILLAGE</span><h3>Village goals</h3><p>Grow at your own pace. Every small milestone makes your world richer.</p><div id="goals" class="goals"></div></section>
     <section class="panel"><span class="eyebrow">WHISPERS FROM AFAR</span><h3>World activity</h3><div id="events" class="events"></div></section>
-    <section class="footnote"><b>About this prototype</b><p>Two groups are simulated in this browser. All villages and crops save locally, including growth while you are away. Live Telegram multiplayer comes later.</p><button id="reset" class="reset">Reset local demo</button></section></aside>
+    <section class="footnote"><b>About this prototype</b><p>Two groups are simulated in this browser. Villagers are decorative for now; crops, buildings, movement, and goals save locally. Real Telegram multiplayer comes later.</p><button id="reset" class="reset">Reset local demo</button></section></aside>
   </div>
   <footer>Every world is someone else's miracle. ✳</footer>
 </div>
