@@ -8,7 +8,7 @@
 <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
 </head><body>
 <div class="shell">
-  <header class="topbar"><div class="brandmark">✳</div><div class="brand"><small>AN INTERTWINED UNIVERSE</small><h1>someone else's <em>sky.</em></h1></div><span class="tag">LIVING WORLDS · V0.6</span></header>
+  <header class="topbar"><div class="brandmark">✳</div><div class="brand"><small>AN INTERTWINED UNIVERSE</small><h1>someone else's <em>sky.</em></h1></div><span class="tag">LIVING WORLDS · V0.7</span></header>
   <div class="heading"><div><span class="eyebrow">✦ YOUR LITTLE UNIVERSE</span><h2>Make a place worth <em>coming home to.</em></h2><p>Plant a field. Build a village. Light up someone else's sky.</p></div><div class="group-picker" id="group-picker"><span>DEMO GROUP</span><div class="toggle"><button data-group="a" class="active">A</button><button data-group="b">B</button></div></div></div>
   <div class="connection-banner" id="network-status" role="status">LOCAL DEMO</div>
   <div class="layout">
@@ -16,8 +16,13 @@
       <section class="scene-card"><div class="scene-head"><div><small>YOUR ISLAND</small><strong id="world-name">Amber Hollow</strong></div><div class="sky-badge" id="sky-badge">☾ Gentle twilight</div></div>
       <div class="viewport" id="scene"><div class="scene-overlay top-left">✧ <span id="scene-hint">Explore: tap a tree or rock to gather</span></div><div class="scene-overlay bottom-left">Drag to orbit · Scroll / pinch to zoom</div><button class="camera-btn" id="camera-btn">⌕ Zoom in</button></div>
       <div class="resources" id="resources" aria-label="Inventory"></div><div class="village-stats" id="villager-count">2 villagers wandering · 4 buildings</div></section>
+      <section class="workshop island-section"><div class="workshop-top"><div><span class="eyebrow">A WORLD WORTH GROWING</span><h3>Make room for your dreams.</h3></div><span class="crew-tag">YOUR ISLAND</span></div>
+      <div class="island-stats"><div><small>DISCOVERED SHORE</small><strong id="island-level">The First Isle</strong></div><div><small>VILLAGE CHARM</small><strong>✿ <span id="island-charm">0</span></strong></div></div>
+      <p class="section-description" id="island-next">Expand the shore to discover new space for your village.</p>
+      <button class="expand-button" id="expand-island">Expand island</button><p id="island-tiles" class="island-subtitle">Your village is growing.</p>
+      </section>
       <section class="workshop"><div class="workshop-top"><div><span class="eyebrow">THE WORKBENCH</span><h3>Make something wonderful.</h3></div><div class="rotate-hint" id="rotate-hint">R to rotate</div></div>
-      <div class="tabs" role="group" aria-label="Choose a tool"><button class="active" data-mode="explore">✥ Explore</button><button data-mode="farm">❀ Farm</button><button data-mode="build">⌂ Build</button><button data-mode="move">↔ Move</button><button data-mode="demolish">♻ Remove</button></div>
+      <div class="tabs" role="group" aria-label="Choose a tool"><button class="active" data-mode="explore">✥ Explore</button><button data-mode="farm">❀ Farm</button><button data-mode="build">⌂ Build</button><button data-mode="landscape">✿ Landscape</button><button data-mode="upgrade">✦ Upgrade</button><button data-mode="move">↔ Move</button><button data-mode="demolish">♻ Remove</button></div>
       <div class="catalog" id="catalog"></div><div id="tool-help" class="tool-help"></div></section>
       <section class="workshop inventory-section"><div class="workshop-top"><div><span class="eyebrow">FROM FARM TO STOREHOUSE</span><h3>Little baskets, real supplies.</h3></div><span class="crew-tag">INVENTORY</span></div>
       <p class="section-description">Harvested goods wait at farms and workshops until you collect them or assign a Hauler. Storehouses expand your shared village storage; paths shorten deliveries.</p>

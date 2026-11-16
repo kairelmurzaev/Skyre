@@ -67,3 +67,12 @@
 .connection-panel{background:#1a3148;border:1px solid #6c9b9b55;border-radius:13px;padding:14px;margin:12px 0 18px;font-size:12px;line-height:1.5}
 .connection-panel p{margin:0 0 9px;color:#cbd9e8}.connection-panel button{padding:10px 12px;color:#182436;background:#f1dcb2;border:0;border-radius:8px;cursor:pointer;font-weight:700}
 .connection-panel[hidden],[hidden]{display:none!important}
+
+/* v0.7: persistent island growth and village personalization. */
+.island-stats{display:flex;justify-content:space-between;gap:12px;margin:14px 0;padding:13px 15px;background:#1b3344;border:1px solid #66887855;border-radius:12px}
+.island-stats small{display:block;color:#9ab8c6;font-size:9px;letter-spacing:1.3px;margin-bottom:7px}
+.island-stats strong{display:block;color:#f1e1be;font-size:16px}
+.expand-button{display:block;width:100%;padding:13px 15px;border:1px solid #dfcb9c;background:#dec797;color:#263240;border-radius:11px;font-weight:800;font-size:12px;cursor:pointer;text-align:center}
+.expand-button:disabled{opacity:.48;cursor:not-allowed;background:#40586a;color:#d7decc;border-color:#718a88}
+.island-subtitle{font-size:11px;color:#91b6b6;margin:12px 0 0}
+@media(max-width:540px){.island-stats strong{font-size:13px}.island-section .expand-button{font-size:11px}}

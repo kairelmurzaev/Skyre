@@ -22,7 +22,7 @@ export function ensureStocks(world){
 export function buildingStock(b,good){return amount(b?.stock?.[good]);}
 export function buildingFree(b,good){return Math.max(0,(STOCK_LIMITS[b?.type]?.[good]||0)-buildingStock(b,good));}
 export function stockUsed(world){return GOODS.reduce((sum,g)=>sum+amount(world.resources[g]),0);}
-export function storageCapacity(world){return BASE_STORAGE+world.buildings.filter(b=>b.type==='warehouse').length*WAREHOUSE_STORAGE;}
+export function storageCapacity(world){return BASE_STORAGE+world.buildings.filter(b=>b.type==='warehouse').reduce((sum,b)=>sum+WAREHOUSE_STORAGE+((b.level||1)>=2?32:0),0);}
 export function storageFree(world){return Math.max(0,storageCapacity(world)-stockUsed(world));}
 export function depotBuildings(world){return world.buildings.filter(b=>b.type==='cottage'||b.type==='warehouse');}
 export function stockedBuildings(world){return world.buildings.filter(b=>GOODS.some(g=>buildingStock(b,g)>0));}
@@ -94,8 +94,8 @@ export function completeDelivery(world,delivery){
 export function processLocal(world,type,buildingId){
   const b=world.buildings.find(b=>b.id===buildingId && b.type===type);
   if(!b)return false;
-  if(type==='windmill' && buildingStock(b,'wheat')>=3 && buildingFree(b,'flour')>=2){
-    b.stock.wheat-=3;b.stock.flour+=2;return true;
+  if(type==='windmill' && buildingStock(b,'wheat')>=3 && buildingFree(b,'flour')>=((b.level||1)>=2?3:2)){
+    b.stock.wheat-=3;b.stock.flour+=(b.level||1)>=2?3:2;return true;
   }
   if(type==='bakery' && buildingStock(b,'flour')>=2 && buildingFree(b,'food')>=6){
     b.stock.flour-=2;b.stock.food+=6;world.resources.coins=(world.resources.coins||0)+4;return true;

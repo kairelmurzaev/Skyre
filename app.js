@@ -1,5 +1,6 @@
+import {LAND_STAGES,LANDSCAPE,expandIsland,setLandscape,islandStage,villageCharm,decorAt,buildableTile} from './terrain.js';
 import {GOODS,HAUL_SIZE,STOCK_LIMITS,buildingStock,storageCapacity,stockUsed,stockedBuildings,inventoryTotals,collectBuilding,supplyBuilding,buildingFree} from './logistics.js';
-import {newGame,SAVE_KEY,CROP,BUILD,other,loadGame,saveGame,findAt,buildAt,removeAt,moveAt,rotateAt,received,growth,plant,harvest,harvestOrchard,orchardReady,gather,processBuilding,sendSeed,record,canAfford,GOALS,goalReady,claimGoal} from './core.js';
+import {newGame,SAVE_KEY,CROP,BUILD,other,loadGame,saveGame,findAt,buildAt,removeAt,moveAt,rotateAt,received,growth,plant,harvest,harvestOrchard,orchardReady,gather,processBuilding,sendSeed,record,canAfford,GOALS,goalReady,claimGoal,UPGRADES,upgradeAt} from './core.js';
 import {createScene} from './scene.js';
 import {JOBS,syncWorkers,assignWorker,setAutoCrop,advanceGame,MAX_OFFLINE_MS} from './workers.js';
 import {planWorkerRoute,roadSummary,workInterval} from './routing.js';
@@ -51,12 +52,13 @@ async function run(command,localAction,message,after){
   }
 }
 
-let group='a',mode='explore',chosenBuild='plot',chosenCrop='wheat',rotation=0,zoomed=false,toastTimer,selectedMove=null,selectedRoute=null;
+let group='a',mode='explore',chosenBuild='plot',chosenCrop='wheat',chosenLandscape='flowers',rotation=0,zoomed=false,toastTimer,selectedMove=null,selectedRoute=null;
 const entries=[['wood','🪵','Wood'],['stone','◈','Stone'],['seeds','✧','Seeds'],['wheat','🌾','Wheat'],['flour','◌','Flour'],['food','🍞','Food'],['coins','✦','Coins']];
 const showToast=text=>{const el=$('toast');el.textContent=text;el.classList.add('shown');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('shown'),3200)};
 const costLabel=cost=>Object.entries(cost).map(([k,v])=>`${v} ${k}`).join(' · ');
 const tileInfo=(x,z)=>{
   const b=findAt(game[group],x,z);
+  const decor=decorAt(game[group],x,z);if(decor)return `${LANDSCAPE[decor]?.name||decor}. Choose Landscape → Clear to change this tile.`;
   if(!b)return 'Empty tile. Choose Build to create something here.';
   if(b.type==='plot'&&!b.crop&&buildingStock(b,'wheat')+buildingStock(b,'food')>0)return 'Farm inventory: '+buildingStock(b,'wheat')+' wheat, '+buildingStock(b,'food')+' food awaiting collection or hauling.';
   if(b.type==='plot'&&b.crop){const pct=Math.round(growth(game,group,b)*100);return pct===100?`${CROP[b.crop.kind].name} is ready! Choose Farm and tap to harvest.`:`${CROP[b.crop.kind].name} growing (${pct}%).`}
@@ -80,6 +82,8 @@ function onHit(hit){
     const from={...selectedMove};
     return run({type:'move',fromX:from.x,fromZ:from.z,x,z},()=>moveAt(w,from.x,from.z,x,z),'Moved a building.',()=>{selectedMove=null});
   }
+  if(mode==='landscape')return run({type:'landscape',x,z,kind:chosenLandscape},()=>setLandscape(w,x,z,chosenLandscape),chosenLandscape==='clear'?'Cleared landscape.':`Created ${LANDSCAPE[chosenLandscape]?.name}.`);
+  if(mode==='upgrade')return run({type:'upgrade',x,z},()=>upgradeAt(w,x,z),'Upgraded a village building.');
   if(mode==='build')return run({type:'build',building:chosenBuild,x,z,rotation},()=>buildAt(w,chosenBuild,x,z,rotation),`Built ${BUILD[chosenBuild].name}.`);
   if(mode==='demolish')return run({type:'remove',x,z},()=>removeAt(w,x,z),'Removed a building.');
   if(mode==='farm'){
@@ -101,6 +105,8 @@ function gatherResource(kind){run({type:'gather',kind},()=>gather(game[group],ki
 function setMode(next){mode=next;selectedMove=null;render()}
 function renderCatalog(){const el=$('catalog');el.replaceChildren();let items=[];
   if(mode==='build')items=Object.entries(BUILD).map(([id,v])=>({id,icon:v.icon,title:v.name,sub:costLabel(v.cost),active:id===chosenBuild}));
+  if(mode==='landscape')items=[...Object.entries(LANDSCAPE).map(([id,v])=>({id,icon:v.icon,title:v.name,sub:costLabel(v.cost)+' · +'+v.charm+' charm',active:id===chosenLandscape})),{id:'clear',icon:'✕',title:'Clear landscape',sub:'Remove an existing garden or pond',active:chosenLandscape==='clear'}];
+  if(mode==='upgrade')items=Object.entries(UPGRADES).map(([id,v])=>({id,icon:BUILD[id].icon,title:v.name,sub:v.description+' · '+costLabel(v.cost)}));
   if(mode==='farm')items=Object.entries(CROP).map(([id,v])=>({id,icon:id==='moonflower'?'🌙':id==='wheat'?'🌾':'🥕',title:v.name,sub:`${v.seed} seed${v.seed>1?'s':''} · ${Math.round(v.ms/1000)}s`,active:id===chosenCrop}));
   if(mode==='move')items=[{id:'move',icon:'↔',title:'Relocate any building',sub:selectedMove?'Choose an empty destination':'Tap a building to select it'}];
   if(mode==='explore')items=[{id:'wood',icon:'🌲',title:'Gather wood',sub:'5 wood · 12s regrowth'},{id:'stone',icon:'🪨',title:'Mine stone',sub:'4 stone · 12s regrowth'}];
@@ -109,19 +115,19 @@ function renderCatalog(){const el=$('catalog');el.replaceChildren();let items=[]
     const emoji=document.createElement('span');emoji.className='emoji';emoji.textContent=item.icon;
     const body=document.createElement('span'),title=document.createElement('strong'),sub=document.createElement('small');title.textContent=item.title;sub.textContent=item.sub;body.append(title,sub);btn.append(emoji,body);
     btn.addEventListener('click',()=>{
-      if(mode==='build'){chosenBuild=item.id;render()}else if(mode==='farm'){chosenCrop=item.id;render()}
+      if(mode==='build'){chosenBuild=item.id;render()}else if(mode==='landscape'){chosenLandscape=item.id;render()}else if(mode==='farm'){chosenCrop=item.id;render()}
       else if(mode==='explore')gatherResource(item.id);
     });el.append(btn);
   }
-  $('rotate-hint').textContent=mode==='build'?`Rotation ${rotation*90}° · R to rotate`:mode==='move'?'Rearrange your village freely':mode==='farm'?'Crops grow while offline':'Drag to orbit';
-  const copy={explore:'Tap <b>trees or rocks</b> in the 3D world to collect materials. Tap buildings to inspect them.',farm:'Choose a crop, then <b>tap an empty garden plot</b>. Return to harvest when it has grown. Sunlight from the other group speeds growth.',build:'Choose a building, then <b>tap a green highlighted tile</b> to place it. Red means occupied or too expensive. Rotate the preview with <b>R</b>.',move:'Tap an existing building, then <b>tap an empty tile</b> to move it for free. Select a building and use <b>R</b> to rotate it.',demolish:'Tap a building to <b>remove it</b>. You recover half the original wood and stone.'};
+  $('rotate-hint').textContent=mode==='build'?`Rotation ${rotation*90}° · R to rotate`:mode==='move'?'Rearrange your village freely':mode==='farm'?'Crops grow while offline':mode==='landscape'?'Gardens brighten your island':mode==='upgrade'?'Tap an eligible building':'Drag to orbit';
+  const copy={explore:'Tap <b>trees or rocks</b> in the 3D world to collect materials. Tap buildings to inspect them.',farm:'Choose a crop, then <b>tap an empty garden plot</b>. Return to harvest when it has grown. Sunlight from the other group speeds growth.',build:'Choose a building, then <b>tap a green highlighted tile</b> to place it. Red means occupied or too expensive. Rotate the preview with <b>R</b>.',move:'Tap an existing building, then <b>tap an empty tile</b> to move it for free. Select a building and use <b>R</b> to rotate it.',demolish:'Tap a building to <b>remove it</b>. You recover half the original wood and stone.',landscape:'Choose a flower garden, lily pond, or Clear. <b>Tap an empty unlocked tile</b>. Ponds block building and walking until removed.',upgrade:'Tap a Cottage, Storehouse or Windmill to upgrade it. Upgrades add villagers, storage or milling output.'};
   $('tool-help').innerHTML=copy[mode]+(mode==='build'||mode==='move'?' <button type="button" id="rotate-button" class="reset">↻ Rotate</button>':'');
   $('rotate-button')?.addEventListener('click',()=>{
     if(mode==='build'){rotation=(rotation+1)%4;render();return}
     if(!selectedMove)return showToast('Select a building to rotate first.');
     run({type:'rotate',x:selectedMove.x,z:selectedMove.z},()=>rotateAt(game[group],selectedMove.x,selectedMove.z),'Rotated the selected building.');
   });
-  $('scene-hint').textContent={explore:'Explore: tap a tree or rock to gather',farm:'Farm: tap a plot to plant or harvest',build:'Build: tap a green tile to place',move:selectedMove?'Move: choose an empty destination':'Move: tap any building',demolish:'Remove: tap a building to recycle'}[mode];
+  $('scene-hint').textContent={explore:'Explore: tap a tree or rock to gather',farm:'Farm: tap a plot to plant or harvest',build:'Build: tap a green tile to place',move:selectedMove?'Move: choose an empty destination':'Move: tap any building',demolish:'Remove: tap a building to recycle',landscape:'Landscape: tap a free tile',upgrade:'Upgrade: tap a cottage, storehouse or windmill'}[mode];
 }
 function renderProduction(){const el=$('production');el.replaceChildren();const w=game[group];const recipes=[{type:'windmill',title:'🌾 Grind cloud wheat',desc:'3 wheat → 2 flour',needs:{wheat:3}},{type:'bakery',title:'🥖 Bake fresh bread',desc:'2 flour → 6 food + 4 coins',needs:{flour:2}}];
   for(const r of recipes){const btn=document.createElement('button');btn.className='recipe';const built=w.buildings.some(b=>b.type===r.type);const affordable=canAfford(w,r.needs);btn.disabled=!built||!affordable;
@@ -226,6 +232,15 @@ function renderGoals(){
     card.append(button);el.append(card);
   }
 }
+function renderIsland(){
+  const world=game[group],level=islandStage(world),next=LAND_STAGES[level+1],current=LAND_STAGES[level];
+  $('island-level').textContent=current.label+` · Tier ${level+1} of ${LAND_STAGES.length}`;
+  $('island-charm').textContent=String(villageCharm(world));
+  $('island-tiles').textContent=String(world.buildings.length)+' buildings · '+Object.keys(world.terrain||{}).length+' landscaped tiles';
+  const button=$('expand-island');button.disabled=!next||!canAfford(world,next.cost);
+  button.textContent=next?'Expand to '+next.label+' · '+costLabel(next.cost):'The island is fully expanded';
+  $('island-next').textContent=next?`Unlock a new ring of land for farms, homes and gardens.`:'Every corner of the island can now be developed.';
+}
 function renderLogistics(){
   const w=game[group],summary=roadSummary(game,group);
   $('road-total').textContent=String(summary.roads);
@@ -252,10 +267,11 @@ function render(){const w=game[group],n=game[other(group)],effects=received(game
   $('turn-mirror').querySelector('small').textContent=w.mirror===2?'Moonbeam is aligned':'Angle '+(w.mirror+1)+'/3 · redirect moonlight';
   $('events').replaceChildren();const recent=game.events.length?game.events.slice(0,5):[{message:'Nothing has stirred the universe yet. Be the first.'}];
   for(const e of recent){const div=document.createElement('div');div.className='event';div.textContent=e.message;if(e.at){const time=document.createElement('time');time.textContent=new Date(e.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});div.append(time)}$('events').append(div)}
-  renderCatalog();renderProduction();renderInventory();renderWorkers();renderLogistics();renderGoals();view?.refresh(game,group,{mode,buildType:chosenBuild,rotation,selectedMove});view?.highlightRoute(selectedRoute);
+  renderCatalog();renderProduction();renderInventory();renderWorkers();renderLogistics();renderGoals();renderIsland();view?.refresh(game,group,{mode,buildType:chosenBuild,landscapeKind:chosenLandscape,rotation,selectedMove});view?.highlightRoute(selectedRoute);
 }
 for(const button of document.querySelectorAll('[data-group]'))button.addEventListener('click',()=>{if(isLive)return;group=button.dataset.group;selectedMove=null;selectedRoute=null;zoomed=false;view?.setCamera(false);render();showToast(`You entered ${game[group].name}.`)});
 for(const button of document.querySelectorAll('[data-mode]'))button.addEventListener('click',()=>setMode(button.dataset.mode));
+$('expand-island').onclick=()=>run({type:'expand'},()=>expandIsland(game[group]),'Your island has gained a new shoreline.');
 $('autocrop').onchange=()=>run({type:'autoCrop',crop:$('autocrop').value},()=>setAutoCrop(game[group],$('autocrop').value),'Updated farming crop.');
 $('toggle-lamp').onclick=toggleLamp;$('turn-mirror').onclick=turnMirror;$('send-seed').onclick=giftSeed;
 $('find-neighbor').onclick=()=>run({type:'connect'},()=>null,'Looking for another group.');

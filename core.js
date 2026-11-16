@@ -1,4 +1,5 @@
 import {STOCK_LIMITS, buildingStock, storageFree, stockUsed, storageCapacity, ensureStocks} from './logistics.js';
+import {ensureTerrain,buildableTile,withinWorld,villageCharm} from './terrain.js';
 // Someone Else's Sky — deterministic game rules. No browser or rendering dependencies.
 export const SAVE_KEY = 'skyre-village-v1';
 export const CROP = {
@@ -27,7 +28,7 @@ const initialWorld=(id)=>({
     {id:id+'-field3',type:'plot',x:-2,z:1,rotation:0,crop:null}
   ],
   lamp:false,mirror:0,harvestedAt:{wood:0,stone:0},nextId:1,progress:{harvests:0,gifts:0,claimed:[]},
-  workers:[],autoCrop:'wheat',workLog:[],workStats:{},simulatedAt:Date.now()
+  landLevel:0,terrain:{},workers:[],autoCrop:'wheat',workLog:[],workStats:{},simulatedAt:Date.now()
 });
 export const newGame=()=>({version:1,a:initialWorld('a'),b:initialWorld('b'),events:[]});
 export function loadGame(storage){
@@ -40,7 +41,7 @@ export function loadGame(storage){
         world.progress={harvests:0,gifts:0,claimed:[],...world.progress};
         if(!Array.isArray(world.progress.claimed))world.progress.claimed=[];
         if(!Number.isInteger(world.nextId))world.nextId=world.buildings.length+1;
-        ensureStocks(world);
+        ensureStocks(world);ensureTerrain(world);
       }
       if(!Array.isArray(saved.events))saved.events=[];
       return saved;
@@ -55,7 +56,8 @@ export const canAfford=(world,cost)=>Object.entries(cost).every(([name,n])=>(wor
 function spend(world,cost){if(!canAfford(world,cost))return false;for(const [name,n] of Object.entries(cost))world.resources[name]-=n;return true;}
 export function buildAt(world,type,x,z,rotation=0){
   if(!BUILD[type])return 'Choose a building first.';
-  if(!within(x,z))return 'Choose a tile on the island.';
+  if(!withinWorld(world,x,z))return 'Unlock more island land to build here.';
+  if(!buildableTile(world,x,z))return 'Clear the landscape before building here.';
   if(findAt(world,x,z))return 'That tile is already occupied.';
   if(!spend(world,BUILD[type].cost))return 'You need more building materials.';
   world.buildings.push({id:'building-'+(world.nextId++),type,x,z,rotation:((rotation%4)+4)%4,crop:null,stock:STOCK_LIMITS[type]?{}:undefined,placedAt:Date.now()});
@@ -64,7 +66,8 @@ export function buildAt(world,type,x,z,rotation=0){
 export function moveAt(world,fromX,fromZ,toX,toZ){
   const building=findAt(world,fromX,fromZ);
   if(!building)return 'Choose a building to move first.';
-  if(!within(toX,toZ))return 'Choose a tile on the island.';
+  if(!withinWorld(world,toX,toZ))return 'Unlock more island land to move here.';
+  if(!buildableTile(world,toX,toZ))return 'Clear the landscape before moving here.';
   if(fromX===toX&&fromZ===toZ)return 'Choose a different destination tile.';
   if(findAt(world,toX,toZ))return 'That tile is already occupied.';
   building.x=toX;building.z=toZ;
@@ -78,10 +81,25 @@ export function rotateAt(world,x,z){
 export function removeAt(world,x,z){
   const b=findAt(world,x,z);if(!b)return 'There is no building here.';
   if(Object.keys(STOCK_LIMITS[b.type]||{}).some(g=>buildingStock(b,g)>0))return 'Collect or deliver the goods before removing this building.';
-  if(b.type==='warehouse' && stockUsed(world)>storageCapacity(world)-64)return 'Empty enough village storage before removing this storehouse.';
+  if(b.type==='warehouse' && stockUsed(world)>storageCapacity(world)-(64+((b.level||1)>=2?32:0)))return 'Empty enough village storage before removing this storehouse.';
   const cost=BUILD[b.type]?.cost||{};
   for(const [name,n] of Object.entries(cost))world.resources[name]=(world.resources[name]||0)+Math.floor(n/2);
   world.buildings=world.buildings.filter(v=>v!==b);return null;
+}
+export const UPGRADES={
+  cottage:{name:'Bigger Cottage',cost:{wood:12,stone:9,coins:10},description:'Welcome one more villager'},
+  warehouse:{name:'Expanded Storehouse',cost:{wood:15,stone:14,coins:12},description:'Add 32 more storage spaces'},
+  windmill:{name:'Efficient Windmill',cost:{wood:18,stone:12,coins:16},description:'Grind 3 wheat into 3 flour'}
+};
+export function upgradeAt(world,x,z){
+  const b=findAt(world,x,z);
+  if(!b||!UPGRADES[b.type])return 'Choose an upgradeable building.';
+  if((b.level||1)>=2)return 'This building is already fully upgraded.';
+  const cost=UPGRADES[b.type].cost;
+  if(!canAfford(world,cost))return 'Not enough materials to upgrade this building.';
+  for(const [good,n] of Object.entries(cost))world.resources[good]-=n;
+  b.level=2;
+  return null;
 }
 export function received(game,id){const neighbor=game[other(id)];return {sun:!!neighbor.lamp,moonbeam:neighbor.mirror===2,breeze:neighbor.buildings.some(b=>b.type==='windmill')};}
 export function growTime(game,id,crop){return CROP[crop].ms*(received(game,id).sun?.8:1);}
@@ -117,8 +135,10 @@ export function gather(world,kind,now=Date.now()){
 export function processBuilding(world,type){
   if(!world.buildings.some(b=>b.type===type))return 'Build the workshop first.';
   if(type==='windmill'){
+    const amount=world.buildings.some(b=>b.type==='windmill'&&(b.level||1)>=2)?3:2;
+    if(storageFree(world)<amount-3)return 'Your village storage is full. Build a storehouse.';
     if(!spend(world,{wheat:3}))return 'Your windmill needs 3 cloud wheat.';
-    world.resources.flour+=2;return null;
+    world.resources.flour+=amount;return null;
   }
   if(type==='bakery'){
     if(world.resources.flour<2)return 'Your bakery needs 2 flour.';
@@ -154,7 +174,9 @@ export const GOALS=[
   {id:'neighbors',name:'Across the glass',description:'Send a seed to another world',reward:{seeds:6,coins:8}},
   {id:'working',name:'Helping hands',description:'Let villagers complete 10 useful jobs',reward:{wood:10,stone:10,coins:14}},
   {id:'pathways',name:'Little footsteps',description:'Build 4 Stone Paths around your village',reward:{stone:7,coins:10}},
-  {id:'storage',name:'Room for tomorrow',description:'Build your first Storehouse',reward:{wood:10,seeds:4,coins:10}}
+  {id:'storage',name:'Room for tomorrow',description:'Build your first Storehouse',reward:{wood:10,seeds:4,coins:10}},
+  {id:'expansion',name:'A wider horizon',description:'Expand your island once',reward:{wood:15,stone:12,coins:8}},
+  {id:'gardens',name:'A beautiful little place',description:'Earn 6 charm from gardens and ponds',reward:{seeds:8,coins:10}}
 ];
 export function goalReady(world,id){
   if(id==='harvest')return (world.progress?.harvests||0)>=1;
@@ -164,6 +186,8 @@ export function goalReady(world,id){
   if(id==='working')return Object.values(world.workStats||{}).reduce((sum,n)=>sum+(Number(n)||0),0)>=10;
   if(id==='pathways')return world.buildings.filter(b=>b.type==='path').length>=4;
   if(id==='storage')return world.buildings.some(b=>b.type==='warehouse');
+  if(id==='expansion')return (world.landLevel||0)>=1;
+  if(id==='gardens')return villageCharm(world)>=6;
   return false;
 }
 export function claimGoal(world,id){

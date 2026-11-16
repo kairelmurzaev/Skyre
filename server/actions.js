@@ -1,14 +1,23 @@
-import {BUILD,CROP,buildAt,moveAt,rotateAt,removeAt,plant,harvest,harvestOrchard,received,gather,processBuilding,sendSeed,claimGoal,record} from '../core.js';
+import {expandIsland,setLandscape,LANDSCAPE,MAX_COORD} from '../terrain.js';
+import {BUILD,CROP,buildAt,moveAt,rotateAt,removeAt,plant,harvest,harvestOrchard,received,gather,processBuilding,sendSeed,claimGoal,record,upgradeAt} from '../core.js';
 import {assignWorker,setAutoCrop} from '../workers.js';
 import {collectBuilding,supplyBuilding} from '../logistics.js';
 
-const integer=(v)=>Number.isSafeInteger(v)&&v>=-4&&v<=4;
+const integer=(v)=>Number.isSafeInteger(v)&&v>=-MAX_COORD&&v<=MAX_COORD;
 const string=(v,max=128)=>typeof v==='string'&&v.length>0&&v.length<=max;
 const coords=(a,keys)=>keys.every(k=>integer(a[k]));
 export function executeAction(game,command,linked,now=Date.now()){
   if(!command||typeof command!=='object'||Array.isArray(command))return {error:'Invalid action.'};
   const a=command,w=game.a;let error=null,message='';
   switch(a.type){
+    case 'expand':
+      error=expandIsland(w);message='Expanded the island shoreline.';break;
+    case 'landscape':
+      if(!coords(a,['x','z'])||!Object.hasOwn(LANDSCAPE,a.kind)&&a.kind!=='clear')return {error:'Invalid landscape.'};
+      error=setLandscape(w,a.x,a.z,a.kind);message='Updated the landscape.';break;
+    case 'upgrade':
+      if(!coords(a,['x','z']))return {error:'Invalid location.'};
+      error=upgradeAt(w,a.x,a.z);message='Upgraded a building.';break;
     case 'build':
       if(!coords(a,['x','z'])||!Object.hasOwn(BUILD,a.building)||!Number.isInteger(a.rotation)||a.rotation<0||a.rotation>3)return {error:'Invalid building placement.'};
       error=buildAt(w,a.building,a.x,a.z,a.rotation);message=`Built ${BUILD[a.building].name}.`;break;

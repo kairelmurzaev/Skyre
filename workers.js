@@ -27,10 +27,10 @@ export function syncWorkers(world,now=Date.now()){
   const roster=[];
   const homes=world.buildings.filter(b=>b.type==='cottage');
   homes.forEach((home,index)=>{
-    for(let n=0;n<2;n++){
+    for(let n=0;n<((home.level||1)>=2?3:2);n++){
       const id=`${home.id}-resident-${n+1}`;
       const old=existing.get(id);
-      const i=index*2+n;
+      const i=homes.slice(0,index).reduce((n,b)=>n+((b.level||1)>=2?3:2),0)+n;
       const job=old&&JOBS[old.job]?old.job:(i===0?'farmer':i===1?'forager':'idle');
       const nextAt=old&&Number.isFinite(old.nextAt)?old.nextAt:now+JOBS[job].ms;
       roster.push({id,name:old?.name||FIRST_NAMES[i%FIRST_NAMES.length],homeId:home.id,job,nextAt,trip:old?.job===job?old?.trip:null});

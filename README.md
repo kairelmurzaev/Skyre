@@ -1,6 +1,14 @@
-# Someone Else’s Sky — v0.6, Shared Skies
+# Someone Else’s Sky — v0.7, A World Worth Growing
 
 A cozy 3D farming/building game where Telegram groups share **real persistent worlds** and can influence a paired group’s sunlight, moonlight and seeds. The farming, local inventories, village workers, roads, hauling and automation from v0.5 remain.
+
+## New in v0.7 — The island grows with you
+
+- **Expand land:** Unlock The Green Shore and The Far Meadow with wood, stone and coins. The 3D shoreline and playable/buildable grid expand together, and the unlock is saved per world.
+- **Landscape:** Use the Landscape tool to place Flower Gardens (1 charm) and Lily Ponds (3 charm), or clear them. Ponds block construction and worker routes; decorative flowers are traversable but must be cleared to build on the tile. A new charm goal rewards decorating your island.
+- **Upgrade:** Upgrade a Cottage to welcome a third resident, upgrade a Storehouse for 32 more storage spaces, or upgrade a Windmill to make 3 flour from 3 wheat. Upgrades are one-time, cost materials, and are reflected in the 3D models.
+- **Compatibility:** Existing browser saves and server worlds retain their buildings, resources, crops, workers and other saved gameplay data. The land expansion and decorating rules are shared by local and server action handlers.
+- **How to try:** Use the **Expand island** button, the **Landscape** and **Upgrade** tabs, and tap tiles or buildings in the 3D scene. Local demo mode works without a Telegram bot. The server integration remains available for later deployment; multiplayer is not required to play.
 
 ## How it works
 

@@ -1,7 +1,8 @@
 import {deliveryOptions,depotBuildings} from './logistics.js';
 // Deterministic, grid-based walking routes. Model only; no Three.js dependency.
 // Grass is always traversable; a constructed Stone Path is faster, not mandatory.
-import {within, findAt, growth, orchardReady, received} from './core.js';
+import {findAt, growth, orchardReady, received} from './core.js';
+import {walkableTile,withinWorld} from './terrain.js';
 
 export const GRASS_STEP_MS = 1350;
 export const ROAD_STEP_MS = 400;
@@ -10,7 +11,7 @@ const DIRS = [[-1,0],[0,-1],[0,1],[1,0]];
 const key = (x,z) => `${x},${z}`;
 const routeCache=new WeakMap();
 function routingState(world){
-  const signature=world.buildings.map(b=>`${b.type}:${b.x},${b.z}`).join('|');
+  const signature=world.landLevel+'|'+Object.entries(world.terrain||{}).sort().join('|')+'|'+world.buildings.map(b=>`${b.type}:${b.x},${b.z}`).join('|');
   let state=routeCache.get(world);
   if(!state||state.signature!==signature){
     state={signature,occupied:new Map(world.buildings.map(b=>[key(b.x,b.z),b.type])),routes:new Map()};
@@ -23,7 +24,7 @@ function routingState(world){
  * Stable tie-breaking makes offline and online simulations deterministic.
  */
 export function routeBetween(world, from, to) {
-  if (!from || !to || !within(from.x,from.z) || !within(to.x,to.z)) return null;
+  if (!from || !to || !walkableTile(world,from.x,from.z) || !walkableTile(world,to.x,to.z)) return null;
   const source=key(from.x,from.z),goal=key(to.x,to.z);
   const state=routingState(world),routeKey=`${source}>${goal}`;
   if(state.routes.has(routeKey))return state.routes.get(routeKey);
@@ -41,7 +42,7 @@ export function routeBetween(world, from, to) {
     const [x,z]=current.split(',').map(Number);
     for(const [dx,dz] of DIRS){
       const nx=x+dx,nz=z+dz,nk=key(nx,nz);
-      if(!within(nx,nz)||visited.has(nk))continue;
+      if(!walkableTile(world,nx,nz)||visited.has(nk))continue;
       const at=state.occupied.get(nk);
       if(at && at!=='path' && nk!==goal)continue;
       const step=nk===goal ? DOOR_STEP_MS : at==='path' ? ROAD_STEP_MS : GRASS_STEP_MS;
