@@ -8,7 +8,7 @@
 <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
 </head><body>
 <div class="shell">
-  <header class="topbar"><div class="brandmark">✳</div><div class="brand"><small>AN INTERTWINED UNIVERSE</small><h1>someone else's <em>sky.</em></h1></div><span class="tag">LIVING WORLDS · V0.4</span></header>
+  <header class="topbar"><div class="brandmark">✳</div><div class="brand"><small>AN INTERTWINED UNIVERSE</small><h1>someone else's <em>sky.</em></h1></div><span class="tag">LIVING WORLDS · V0.5</span></header>
   <div class="heading"><div><span class="eyebrow">✦ YOUR LITTLE UNIVERSE</span><h2>Make a place worth <em>coming home to.</em></h2><p>Plant a field. Build a village. Light up someone else's sky.</p></div><div class="group-picker"><span>DEMO GROUP</span><div class="toggle"><button data-group="a" class="active">A</button><button data-group="b">B</button></div></div></div>
   <div class="layout">
     <main class="game-column">
@@ -18,25 +18,32 @@
       <section class="workshop"><div class="workshop-top"><div><span class="eyebrow">THE WORKBENCH</span><h3>Make something wonderful.</h3></div><div class="rotate-hint" id="rotate-hint">R to rotate</div></div>
       <div class="tabs" role="group" aria-label="Choose a tool"><button class="active" data-mode="explore">✥ Explore</button><button data-mode="farm">❀ Farm</button><button data-mode="build">⌂ Build</button><button data-mode="move">↔ Move</button><button data-mode="demolish">♻ Remove</button></div>
       <div class="catalog" id="catalog"></div><div id="tool-help" class="tool-help"></div></section>
+      <section class="workshop inventory-section"><div class="workshop-top"><div><span class="eyebrow">FROM FARM TO STOREHOUSE</span><h3>Little baskets, real supplies.</h3></div><span class="crew-tag">INVENTORY</span></div>
+      <p class="section-description">Harvested goods wait at farms and workshops until you collect them or assign a Hauler. Storehouses expand your shared village storage; paths shorten deliveries.</p>
+      <div class="inventory-meter"><div><strong id="store-used">0 / 36</strong><small>Village storage used · wheat + flour + food</small></div><div class="meter-track"><div id="store-fill"></div></div></div>
+      <div class="inventory-overview" id="inventory-overview" aria-label="All village goods"></div>
+      <div class="inventory-subtitle">GOODS WAITING AT BUILDINGS</div><div class="inventory-buildings" id="inventory-buildings"></div>
+      <p class="inventory-tip">You can collect or supply goods manually at any time. Assign villagers to Hauler to move baskets automatically.</p>
+      </section>
       <section class="workshop logistics-section"><div class="workshop-top"><div><span class="eyebrow">A VILLAGE CONNECTED BY FOOTSTEPS</span><h3>Little roads, big journeys.</h3></div><span class="crew-tag">LOGISTICS</span></div>
-      <p class="section-description">Villagers travel between home and work. Grass routes work, but connected Stone Paths shorten delivery time and increase automated production.</p>
+      <p class="section-description">Villagers carry goods along actual routes between farms, windmills, bakeries and your village stores. Stone Paths speed these journeys. Grass routes always work.</p>
       <div class="logistics-stats"><div><span id="road-total">0</span><small>Stone paths</small></div><div><span id="road-users">0 / 2</span><small>Workers using roads</small></div><div><span id="route-total">2 / 2</span><small>Workers with a route</small></div></div>
       <div id="logistics-hint" class="logistics-hint">Place a Stone Path between a cottage and a farm to speed up delivery.</div>
       </section>
       <section class="workshop workers-section"><div class="workshop-top"><div><span class="eyebrow">YOUR VILLAGE HAS A HEARTBEAT</span><h3>Little hands, big dreams.</h3></div><span class="crew-tag">AUTOMATION</span></div>
-      <p class="section-description">Give each resident a job. Farmers tend fields, millers turn wheat into flour, bakers prepare bread, and foragers collect materials—even when you're away.</p>
+      <p class="section-description">Give residents a job. Farmers harvest into their plots, Haulers carry goods, millers and bakers operate stocked workshops, and foragers gather supplies—even while you are away.</p>
       <div class="workers-controls"><label for="autocrop">Farmers should grow</label><select id="autocrop"><option value="wheat">🌾 Cloud Wheat</option><option value="carrot">🥕 Sunroot</option><option value="moonflower">🌙 Moonflower</option></select></div>
       <div class="worker-summary" id="worker-summary"></div><div id="workers" class="workers" aria-label="Village worker assignments"></div><p id="workers-empty" hidden>Build a cottage to welcome villagers.</p>
       <div class="worker-log-title">RECENT VILLAGE ACTIVITY</div><div id="worker-journal" class="worker-journal" aria-live="polite"></div>
       </section>
-      <section class="workshop"><div class="workshop-top"><div><span class="eyebrow">FROM FIELD TO HOME</span><h3>Craft &amp; produce</h3></div></div><div id="production" class="production"></div></section>
+      <section class="workshop"><div class="workshop-top"><div><span class="eyebrow">FROM FIELD TO HOME</span><h3>Craft &amp; produce</h3></div></div><p class="section-description">Hands-on crafting uses your shared village storage. Assigned millers and bakers instead use goods delivered to their individual workplaces.</p><div id="production" class="production"></div></section>
     </main>
     <aside class="side-column"><section class="panel"><span class="eyebrow">SOMEWHERE, SOMEONE ELSE</span><h3>The other side of your sky</h3><p>Your lamp still controls another group's weather. And their light changes how your crops grow.</p><div class="neighbor"><div class="orb">✺</div><div><small>CONNECTED TO</small><strong id="neighbor-name">Moon Garden</strong><span id="neighbor-details">A tiny world inside your globe</span></div></div>
     <div class="neighbor-actions"><button id="toggle-lamp"><span>☼</span><div><b>Desk lamp</b><small>Give them sunlight</small></div></button><button id="turn-mirror"><span>☾</span><div><b>Moon mirror</b><small>Align their moonbeam</small></div></button><button id="send-seed"><span>✧</span><div><b>Send a seed</b><small>Gift two seeds to their farm</small></div></button></div>
     <div class="effect-note" id="effect-note"></div></section>
     <section class="panel"><span class="eyebrow">SMALL DREAMS, BIG VILLAGE</span><h3>Village goals</h3><p>Grow at your own pace. Every small milestone makes your world richer.</p><div id="goals" class="goals"></div></section>
     <section class="panel"><span class="eyebrow">WHISPERS FROM AFAR</span><h3>World activity</h3><div id="events" class="events"></div></section>
-    <section class="footnote"><b>About this prototype</b><p>Two groups are simulated in this browser. Villagers follow traversable routes, and roads speed up automated work. Resources still use shared village inventory. Progress saves locally. Real Telegram multiplayer comes later.</p><button id="reset" class="reset">Reset local demo</button></section></aside>
+    <section class="footnote"><b>About this prototype</b><p>Two groups are simulated in this browser. Villagers follow traversable routes, and roads speed up automated work. Wheat, flour and food now have limited village storage and local building inventories. Progress saves locally. Real Telegram multiplayer comes later. No bot credentials are needed to play this demo.</p><button id="reset" class="reset">Reset local demo</button></section></aside>
   </div>
   <footer>Every world is someone else's miracle. ✳</footer>
 </div>

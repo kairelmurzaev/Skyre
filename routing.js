@@ -1,3 +1,4 @@
+import {deliveryOptions,depotBuildings} from './logistics.js';
 // Deterministic, grid-based walking routes. Model only; no Three.js dependency.
 // Grass is always traversable; a constructed Stone Path is faster, not mandatory.
 import {within, findAt, growth, orchardReady, received} from './core.js';
@@ -66,6 +67,31 @@ export function routeBetween(world, from, to) {
 }
 
 const gatheringSpots=[{x:-3,z:2},{x:3,z:2},{x:-3,z:-2},{x:3,z:-2}];
+function joinRoutes(...segments){
+  const points=[];let ms=0,roadSteps=0,grassSteps=0;
+  for(const segment of segments){
+    if(!segment)return null;
+    points.push(...segment.points.slice(points.length?1:0));
+    ms+=segment.ms;roadSteps+=segment.roadSteps;grassSteps+=segment.grassSteps;
+  }
+  return {points,ms,roadSteps,grassSteps};
+}
+function planHaul(world,home){
+  const depots=depotBuildings(world);if(!depots.length)return null;
+  let best=null;
+  for(const delivery of deliveryOptions(world)){
+    const sources=delivery.sourceId==='depot'?depots:world.buildings.filter(b=>b.id===delivery.sourceId);
+    const destinations=delivery.destId==='depot'?depots:world.buildings.filter(b=>b.id===delivery.destId);
+    for(const source of sources)for(const destination of destinations){
+      const route=joinRoutes(routeBetween(world,home,source),routeBetween(world,source,destination),routeBetween(world,destination,home));
+      if(!route)continue;
+      const candidate={home:{x:home.x,z:home.z},target:{x:destination.x,z:destination.z},route,task:'deliver',delivery};
+      if(!best||delivery.priority<best.delivery.priority||(delivery.priority===best.delivery.priority&&route.ms<best.route.ms))best=candidate;
+    }
+  }
+  return best;
+}
+
 
 /** Get the route to an actual workplace. Farmer priority: ripe crops, ripe orchards, empty plots,
  * then unripe plots; routes choose the fastest reachable candidate in that tier.
@@ -73,6 +99,7 @@ const gatheringSpots=[{x:-3,z:2},{x:3,z:2},{x:-3,z:-2},{x:3,z:-2}];
 export function planWorkerRoute(game,id,worker,at=Date.now()){
   const world=game[id], home=world?.buildings.find(b=>b.id===worker?.homeId&&b.type==='cottage');
   if(!home||!worker||worker.job==='idle')return null;
+  if(worker.job==='hauler')return planHaul(world,home);
   let tiers=[];
   if(worker.job==='farmer'){
     const plots=world.buildings.filter(b=>b.type==='plot');
@@ -100,7 +127,7 @@ export function planWorkerRoute(game,id,worker,at=Date.now()){
 /** Roads affect actual job throughput. Includes a return trip; keeps a minimum to preserve cozy pacing. */
 export function workInterval(world,worker,jobMs,plan){
   if(!plan)return jobMs;
-  return jobMs+plan.route.ms*2;
+  return jobMs+plan.route.ms*(worker.job==='hauler'?1:2);
 }
 
 export function roadSummary(game,id,at=Date.now()){

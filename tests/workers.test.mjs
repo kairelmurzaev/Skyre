@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newGame,buildAt,removeAt,findAt,received,orchardReady,saveGame,loadGame,plant} from '../core.js';
 import {JOBS,MAX_OFFLINE_MS,syncWorkers,assignWorker,setAutoCrop,advanceGame} from '../workers.js';
+import {buildingStock,inventoryTotals,storageCapacity} from '../logistics.js';
 
 function setup(){
   const now=Date.now();const game=newGame();
@@ -27,7 +28,7 @@ test('villagers plant, harvest, and forage without user input',()=>{
   assert.ok(result.a.planted>=3);
   assert.ok(result.a.harvested>=1);
   assert.ok(result.a.foraged>=2);
-  assert.ok(game.a.resources.wheat>0);
+  assert.ok(game.a.buildings.some(b=>buildingStock(b,'wheat')>0), 'automated crops wait in farm inventory');
   assert.ok(game.a.resources.wood>35);
   assert.ok(game.a.progress.harvests>=1);
   assert.ok(game.a.workLog.length<=8);
@@ -44,17 +45,23 @@ test('farmers respect crop choice and will not spend seeds they do not have',()=
   assert.equal(empty.a.buildings.filter(b=>b.crop).length,0);
 });
 
-test('miller and baker run a shared production chain automatically',()=>{
+test('farmers, haulers, millers and bakers run an actual production chain',()=>{
   const {game,now}=setup();const w=game.a;
+  w.resources.wood=250;w.resources.stone=250;w.resources.seeds=100;
   assert.equal(buildAt(w,'windmill',0,2),null);assert.equal(buildAt(w,'bakery',1,2),null);
-  w.resources.wheat=15;
-  assert.equal(assignWorker(w,w.workers[0].id,'miller',now),null);
-  assert.equal(assignWorker(w,w.workers[1].id,'baker',now),null);
-  const result=advanceGame(game,now+150000);
-  assert.ok(result.a.milled>=2);
+  assert.equal(buildAt(w,'cottage',3,-1),null);
+  syncWorkers(w,now);
+  w.resources.wheat=15; // Goods from earlier manual harvests can enter the delivery chain.
+  assert.equal(assignWorker(w,w.workers[0].id,'farmer',now),null);
+  assert.equal(assignWorker(w,w.workers[1].id,'hauler',now),null);
+  assert.equal(assignWorker(w,w.workers[2].id,'miller',now),null);
+  assert.equal(assignWorker(w,w.workers[3].id,'baker',now),null);
+  const result=advanceGame(game,now+600000);
+  assert.ok(result.a.delivered>=3,'haulers complete physical transfers');
+  assert.ok(result.a.milled>=1);
   assert.ok(result.a.baked>=1);
   assert.ok(w.resources.coins>=4);
-  assert.ok(w.resources.food>=10);
+  assert.ok(inventoryTotals(w).food>4);
   assert.equal(game.b.resources.coins,0);
 });
 
@@ -120,7 +127,7 @@ test('invalid worker jobs and missing workers cannot be assigned',()=>{
   const {game,now}=setup();
   assert.match(assignWorker(game.a,'not-found','farmer',now),/no longer lives/);
   assert.match(assignWorker(game.a,game.a.workers[0].id,'wizard',now),/valid/);
-  assert.equal(Object.keys(JOBS).length,5);
+  assert.equal(Object.keys(JOBS).length,6);
 });
 
 

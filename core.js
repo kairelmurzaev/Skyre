@@ -1,3 +1,4 @@
+import {STOCK_LIMITS, buildingStock, storageFree, stockUsed, storageCapacity, ensureStocks} from './logistics.js';
 // Someone Else's Sky — deterministic game rules. No browser or rendering dependencies.
 export const SAVE_KEY = 'skyre-village-v1';
 export const CROP = {
@@ -12,7 +13,8 @@ export const BUILD = {
   bakery: {name:'Bakery',cost:{wood:15,stone:12},icon:'🥖',description:'Bake bread from flour'},
   well: {name:'Moonwell',cost:{wood:7,stone:9},icon:'💧',description:'A gentle light for your island'},
   path: {name:'Stone Path',cost:{stone:1},icon:'◻',description:'Shorten worker travel time between homes and workplaces'},
-  orchard: {name:'Dream Orchard',cost:{wood:10,stone:6},icon:'🌳',description:'Grows fruit and magical seeds every 90 seconds'}
+  orchard: {name:'Dream Orchard',cost:{wood:10,stone:6},icon:'🌳',description:'Grows fruit and magical seeds every 90 seconds'},
+  warehouse: {name:'Storehouse',cost:{wood:16,stone:12},icon:'📦',description:'Adds 64 spaces for food, flour, and wheat'}
 };
 const names={a:'Amber Hollow',b:'Moon Garden'};
 export const other=id=>id==='a'?'b':'a';
@@ -38,6 +40,7 @@ export function loadGame(storage){
         world.progress={harvests:0,gifts:0,claimed:[],...world.progress};
         if(!Array.isArray(world.progress.claimed))world.progress.claimed=[];
         if(!Number.isInteger(world.nextId))world.nextId=world.buildings.length+1;
+        ensureStocks(world);
       }
       if(!Array.isArray(saved.events))saved.events=[];
       return saved;
@@ -55,7 +58,7 @@ export function buildAt(world,type,x,z,rotation=0){
   if(!within(x,z))return 'Choose a tile on the island.';
   if(findAt(world,x,z))return 'That tile is already occupied.';
   if(!spend(world,BUILD[type].cost))return 'You need more building materials.';
-  world.buildings.push({id:'building-'+(world.nextId++),type,x,z,rotation:((rotation%4)+4)%4,crop:null,placedAt:Date.now()});
+  world.buildings.push({id:'building-'+(world.nextId++),type,x,z,rotation:((rotation%4)+4)%4,crop:null,stock:STOCK_LIMITS[type]?{}:undefined,placedAt:Date.now()});
   return null;
 }
 export function moveAt(world,fromX,fromZ,toX,toZ){
@@ -74,6 +77,8 @@ export function rotateAt(world,x,z){
 }
 export function removeAt(world,x,z){
   const b=findAt(world,x,z);if(!b)return 'There is no building here.';
+  if(Object.keys(STOCK_LIMITS[b.type]||{}).some(g=>buildingStock(b,g)>0))return 'Collect or deliver the goods before removing this building.';
+  if(b.type==='warehouse' && stockUsed(world)>storageCapacity(world)-64)return 'Empty enough village storage before removing this storehouse.';
   const cost=BUILD[b.type]?.cost||{};
   for(const [name,n] of Object.entries(cost))world.resources[name]=(world.resources[name]||0)+Math.floor(n/2);
   world.buildings=world.buildings.filter(v=>v!==b);return null;
@@ -96,7 +101,10 @@ export function harvest(game,id,x,z,now=Date.now()){
   const w=game[id],b=findAt(w,x,z);
   if(!b||b.type!=='plot'||!b.crop)return 'Nothing to harvest here.';
   if(growth(game,id,b,now)<1)return 'Your plants are still growing.';
-  for(const [key,n] of Object.entries(CROP[b.crop.kind].yield))w.resources[key]=(w.resources[key]||0)+n;
+  const yields=CROP[b.crop.kind].yield;
+  const needed=(yields.wheat||0)+(yields.food||0);
+  if(storageFree(w)<needed)return 'Your village storage is full. Build a storehouse.';
+  for(const [key,n] of Object.entries(yields))w.resources[key]=(w.resources[key]||0)+n;
   // A correctly aligned neighbor mirror makes the harvest more valuable, never mandatory.
   if(received(game,id).moonbeam)w.resources.coins+=2;
   b.crop=null;w.progress??={harvests:0,gifts:0,claimed:[]};w.progress.harvests++;return null;
@@ -113,6 +121,8 @@ export function processBuilding(world,type){
     world.resources.flour+=2;return null;
   }
   if(type==='bakery'){
+    if(world.resources.flour<2)return 'Your bakery needs 2 flour.';
+    if(storageFree(world)<4)return 'Your village storage is full. Build a storehouse.';
     if(!spend(world,{flour:2}))return 'Your bakery needs 2 flour.';
     world.resources.food+=6;world.resources.coins+=4;return null;
   }
@@ -132,6 +142,7 @@ export function harvestOrchard(world,x,z,now=Date.now(),breeze=false){
   const b=findAt(world,x,z);
   if(!b||b.type!=='orchard')return 'Choose a Dream Orchard.';
   if(!orchardReady(b,now,breeze))return 'The orchard needs more time to grow fruit.';
+  if(storageFree(world)<4)return 'Your village storage is full. Build a storehouse.';
   b.harvestedAt=now;
   world.resources.food+=4;world.resources.seeds+=1;
   return null;
@@ -142,7 +153,8 @@ export const GOALS=[
   {id:'bakery',name:'Bread for everyone',description:'Build a windmill and bakery',reward:{wood:12,coins:12}},
   {id:'neighbors',name:'Across the glass',description:'Send a seed to another world',reward:{seeds:6,coins:8}},
   {id:'working',name:'Helping hands',description:'Let villagers complete 10 useful jobs',reward:{wood:10,stone:10,coins:14}},
-  {id:'pathways',name:'Little footsteps',description:'Build 4 Stone Paths around your village',reward:{stone:7,coins:10}}
+  {id:'pathways',name:'Little footsteps',description:'Build 4 Stone Paths around your village',reward:{stone:7,coins:10}},
+  {id:'storage',name:'Room for tomorrow',description:'Build your first Storehouse',reward:{wood:10,seeds:4,coins:10}}
 ];
 export function goalReady(world,id){
   if(id==='harvest')return (world.progress?.harvests||0)>=1;
@@ -151,6 +163,7 @@ export function goalReady(world,id){
   if(id==='neighbors')return (world.progress?.gifts||0)>=1;
   if(id==='working')return Object.values(world.workStats||{}).reduce((sum,n)=>sum+(Number(n)||0),0)>=10;
   if(id==='pathways')return world.buildings.filter(b=>b.type==='path').length>=4;
+  if(id==='storage')return world.buildings.some(b=>b.type==='warehouse');
   return false;
 }
 export function claimGoal(world,id){

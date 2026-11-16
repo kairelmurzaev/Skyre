@@ -1,48 +1,43 @@
-# Someone Else's Sky — Living Worlds (v0.4)
+# Someone Else's Sky · v0.5 — The Little Supply Chain
 
-A cozy, low-pressure 3D farming and village-building prototype. The village sits inside a glass globe; each group's lamp, mirror, gifts, and windmill can affect another world's growing conditions.
+A cozy 3D village builder with farming, job-based automation, roads, **building inventories**, a **real delivery chain**, and two *simulated* connected worlds. Built for mobile browsers as a future Telegram Mini App.
 
-**Milestone 1.6: real walkable logistics.** Workers now navigate the island using a deterministic, weighted grid pathfinder. Stone Paths improve travel time and therefore actual automated job throughput; grass remains walkable so a missing road never locks casual players out of farming. Villagers visibly follow routes and return with baskets, and you can inspect routes through the worker cards.
+## Run
 
-## Run locally
+Requires a modern WebGL-capable browser and internet access for the Three.js CDN. No dependencies or build needed for the playable demo.
 
-```bash
+```sh
 python3 -m http.server 8000
+# open http://localhost:8000
+npm test        # Node.js 20+, all deterministic game-logic suites
 ```
 
-Visit `http://localhost:8000` on a modern browser with WebGL and internet access (Three.js 0.170.0 is loaded from a CDN). No `npm install` is required to play.
+## How to play
 
-```bash
-npm test
-```
+1. **Grow:** select Farm, pick Cloud Wheat / Sunroot / Moonflower, tap an empty garden plot. Tap ripe crops to harvest them directly into village stores. Crops continue growing between sessions.
+2. **Build:** select Build, choose a structure, tap a valid empty cell. Build fields, cottages, Stone Paths, a Windmill, a Bakery, an Orchard, and the new **Storehouse**. Move and rotate structures to lay out efficient paths.
+3. **Worker jobs:** each cottage houses two villagers. Assign Farmer, Hauler, Miller, Baker, Forager or Rest in the worker panel.
+4. **Physical inventories:** farmers place wheat or food into their **plot stock**, not directly into the village stores. Orchards also stock fruit locally. The **Hauler** job carries batches of up to four goods from farms or the shared stores to workshops and from workshops back to the stores.
+5. **Local production:** millers consume **3 wheat stored at a windmill** and create **2 flour there**; bakers consume **2 flour stored at a bakery** and make **6 food at the bakery**, plus 4 coins. Haulers complete the chain by delivering flour and bread. No goods are duplicated or teleported between buildings by automated jobs.
+6. **Optional hands-on logistics:** press **Collect** on any stocked building to move available goods into the shared stores, or **Supply** on a workshop to stock it from shared stores. These buttons are intentionally instant for relaxed play. The manual Craft & Produce buttons still work with supplies already in the village stores.
+7. **Storage:** the village begins with **36 shared storage spaces** for *wheat + flour + food combined*. A **Storehouse** adds **64 spaces**. Goods waiting inside production buildings have separate per-building limits. Other materials (wood, stone, seeds and coins) do not count toward this goods cap. Full storage blocks new deposits and manual goods harvests; it never deletes items.
+8. **Paths:** haulers travel along actual shortest routes from home to pickup to drop-off and back. Roads reduce travel time. The route button shows a worker's journey. Grass remains walkable, so roads are a useful improvement rather than a hard requirement.
+9. **Connected worlds:** switch between the simulated villages A and B. Your lamp lights the other village, the mirror gifts moonlight, windmills provide a breeze to their orchards, and you can send seeds. These interactions are local demo mechanics, not cross-device multiplayer.
 
-Runs the deterministic Node.js game-logic tests, including route connectivity, road effects on job timers, off-line catch-up, legacy save restoration, and resource safety (Node.js 20+).
+**Suggested first production setup:** Build a Windmill and Bakery, add another Cottage for enough villagers, assign one Farmer, one Hauler, one Miller and one Baker. Add Stone Paths and a Storehouse when space gets tight. Or just farm and decorate at your own pace.
 
-## Play
+## Design and implementation notes
 
-1. **Farm:** plant Cloud Wheat, Sunroot or Moonflowers. Growth continues between visits.
-2. **Build:** choose cottages, plots, windmills, bakeries, moonwells, Dream Orchards and **Stone Paths**. Preview green/red placement; use `R` to rotate. Move existing structures without losing crops.
-3. **Hire:** a cottage houses two villagers. Assign farmer, miller, baker, forager or rest. Farmers harvest, millers make flour, bakers make bread, and foragers collect materials.
-4. **Lay out roads:** paths reduce travel costs from a villager's cottage to the currently selected field/workshop. Shorter routes let the worker finish more jobs per hour. A building occupying a cell cannot be passed through.
-5. **Inspect journeys:** in the Villagers section, select *Show walking route* on a worker. A dashed line highlights the route in the 3D village and the worker card shows a projected cycle duration. A blocked workplace is identified clearly.
-6. **Complete a gentle milestone:** build four Stone Paths to unlock the Little Footsteps reward.
-7. **Build your production chain:** wheat → flour → bread; adjust worker jobs to keep things moving. The entire village shares inventory in this prototype; it's **not** a simulation of per-building stockpiles or item-by-item transfers yet.
-8. **Connect worlds:** switch simulated group A/B to give sunlight, moonlight, windmill breeze and seeds to the other group. The other group need not be online for your village to function.
-9. **Keep your progress:** worlds are persisted to localStorage under `skyre-village-v1`. Offline worker catch-up is limited to four hours and applied at most once for a given elapsed interval.
+- `core.js` — deterministic core game rules, upgrades, shared village inventory, migration.
+- `logistics.js` — pure stock tracking, hard capacity checks, planned delivery options and **transactional transfers**. Village stores are pooled across cottages/storehouses for simple player-facing logistics; individual producer stocks are real and must be moved by a hauler or manually.
+- `routing.js` — weighted grid pathfinding, blocked structures, shorter roads, multi-stop hauler routing.
+- `workers.js` — timed production simulation with limited offline catch-up, job scheduling, stock-producing farmers, real mill/bakery stock consumption and atomic hauler transfers.
+- `scene.js` — procedural Three.js world, warehouse model, visible stock crates, job-colored villagers and route-following movement.
+- `app.js`, `index.html`, `style.css` — inventory dashboard, building controls, production actions, village panels and mobile layout.
+- `tests/*.test.mjs` — regression, migration, routing, inventory conservation, capacity and full production-chain tests.
 
-## Implementation
+Existing `skyre-village-v1` browser saves migrate in place; new building stock defaults to empty. All persistent data currently lives in each browser's `localStorage`, so **there is no real Telegram login, shared server database or cross-device world syncing**. A later multiplayer milestone must validate Telegram Mini App `initData` on the backend and implement server-authoritative game mutations. Never commit bot credentials.
 
-- `core.js` — pure game state, resource economy, land/building rules, crops and shared-world bonuses
-- `routing.js` — deterministic Dijkstra shortest-time routes on the existing 9×9 island mask; road tiles are faster than grass; cache invalidates when buildings move, appear or disappear; no rendering dependencies
-- `workers.js` — reproducible worker scheduling, route-derived round-trip travel times, offline catch-up and save-safe trip metadata
-- `scene.js` — Three.js island with crops, villagers, parcel props and route overlays
-- `app.js` — UI, assignments, input, resource display and selection
-- `tests/` — unit/regression tests for game rules, workers and routes
+### Scope limitations
 
-**Design choice:** Unlike stricter road networks used by games such as Anno, roads in Skyre are an **efficiency incentive**, not an absolute prerequisite. The grid routing technique follows established weighted-graph pathfinding practices. Inspired by production-chain clarity from city builders and transport systems in factory games.
-
-## Current limitations and deployment safety
-
-This is a **local-browser demo**. The A/B worlds are stored in **one browser**, not synchronized between devices. It's **not yet** a live Telegram game or server-authoritative multiplayer. Group IDs must eventually be derived from authenticated Telegram context, never trusted from client requests. When a secure server is implemented, validate Telegram `initData` cryptographically, keep the bot token in server-side secrets, and authorize every change to shared worlds. No bot credentials are included here.
-
-For production we also need a proper mobile performance budget, WebGL visual QA on physical devices, and a backend with transactional saves. This codebase deliberately avoids claiming those production features are complete.
+The demo uses CDN-hosted Three.js and has not been cross-browser performance tested on real phones. Work routes and production are simulated in deterministic timer steps, not with individual animated physical items. Shared village stores are a single pooled depot inventory even if multiple storehouses exist. These are deliberate prototype simplifications, not a secure multiplayer economy.

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {within, received, growth, findAt, BUILD, canAfford, orchardReady} from './core.js';
+import {buildingStock} from './logistics.js';
 import {planWorkerRoute} from './routing.js';
 
 // Tiny procedural diorama: all models are built from geometry, no asset downloads.
@@ -176,6 +177,12 @@ export function createScene(mount, callbacks){
       const roof=cone(g,.6,.38,[0,1.30,0],'#9b7d91',4);roof.rotation.y=Math.PI/4;
     } else if(b.type==='path'){
       for(let i=0;i<4;i++)box(g,[.36,.035,.38],[(i%2-.5)*.44,.03,(Math.floor(i/2)-.5)*.45],i%2?'#baa997':'#a4aaa2');
+    } else if(b.type==='warehouse'){
+      box(g,[.86,.74,.83],[0,.44,0],'#9eb2a8');
+      const roof=cone(g,.66,.56,[0,1.12,0],'#8d7290',4);roof.rotation.y=Math.PI/4;
+      box(g,[.48,.56,.05],[0,.37,.44],'#8c735b');
+      for(let n=0;n<3;n++)box(g,[.19,.19,.20],[-.23+n*.21,.17,.49],'#c9a57b');
+      box(g,[.4,.12,.04],[0,.87,.435],'#eee1b7');
     } else if(b.type==='orchard'){
       cyl(g,.095,.14,.72,[0,.43,0],'#8d7160',8);
       for(const [ox,oy,oz,s] of [[0,1.06,0,.44],[-.24,.87,.09,.29],[.23,.92,-.11,.29]])ball(g,s,[ox,oy,oz],'#b8cfab');
@@ -186,6 +193,13 @@ export function createScene(mount, callbacks){
         fruits.push(f);
       }
       orchards.push({b,fruits});
+    }
+    // Small parcels are a readable signal that a workplace has undelivered stock.
+    const stored=['wheat','flour','food'].reduce((sum,k)=>sum+buildingStock(b,k),0);
+    const crates=Math.min(3,Math.ceil(stored/4));
+    for(let i=0;i<crates;i++){
+      const crate=box(g,[.18,.17,.18],[-.35+i*.24,.22,-.40],i%2?'#dabf8c':'#b78f68');
+      box(crate,[.16,.02,.02],[0,.1,0],'#efe0b5');
     }
     mark(g,{kind:'tile',x:b.x,z:b.z});
   }
@@ -199,11 +213,11 @@ export function createScene(mount, callbacks){
       if(!home)continue;
       const plan=planWorkerRoute(game,id,worker,Date.now());
       const saved=worker.trip?.points;
-      const validSaved=Array.isArray(saved)&&saved.length>1&&saved.every((p,j)=>within(p.x,p.z)&&(j===0||j===saved.length-1||!findAt(world,p.x,p.z)||findAt(world,p.x,p.z).type==='path'));
+      const validSaved=Array.isArray(saved)&&saved.length>1&&saved.every((p,j)=>within(p.x,p.z)&&(j===0||j===saved.length-1||!findAt(world,p.x,p.z)||['path','cottage','warehouse'].includes(findAt(world,p.x,p.z).type)||[worker.trip?.delivery?.sourceId,worker.trip?.delivery?.destId].includes(findAt(world,p.x,p.z).id)));
       const path=validSaved?saved:(plan?.route.points || [{x:home.x,z:home.z}]);
       const v=new THREE.Group();v.position.set(home.x,.22,home.z);residents.add(v);
-      const colors={farmer:'#a1bea0',miller:'#d6c49e',baker:'#e2a7a8',forager:'#95bccc',idle:'#c4b5d4'};
-      const hats={farmer:'#779d66',miller:'#b2a17a',baker:'#f4ece0',forager:'#7095a1',idle:'#a56d8e'};
+      const colors={farmer:'#a1bea0',miller:'#d6c49e',baker:'#e2a7a8',forager:'#95bccc',hauler:'#d6b88d',idle:'#c4b5d4'};
+      const hats={farmer:'#779d66',miller:'#b2a17a',baker:'#f4ece0',forager:'#7095a1',hauler:'#b89469',idle:'#a56d8e'};
       cyl(v,.11,.095,.31,[0,.31,0],colors[worker.job]||colors.idle,9);
       ball(v,.105,[0,.58,0],i%2?'#9d785e':'#d9ae86');
       cone(v,worker.job==='baker'?.19:.155,worker.job==='baker'?.19:.12,[0,.75,0],hats[worker.job]||hats.idle,8);
@@ -318,13 +332,13 @@ export function createScene(mount, callbacks){
         const until=Number.isFinite(trip?.endsAt)?trip.endsAt:worker.nextAt;
         const phase=Math.max(0,Math.min(1,(now-from)/Math.max(1000,until-from)));
         returning=phase>=.5;
-        const u=returning?(1-phase)*2:phase*2;
+        const u=worker.job==='hauler'?phase:(returning?(1-phase)*2:phase*2);
         const pos=followRoute(path,u);
         const upcoming=followRoute(path,Math.max(0,Math.min(1,u+(returning?-.015:.015))));
         walker.v.position.set(pos.x,.19+Math.abs(Math.sin(t*5+walker.phase))*.035,pos.z);
         const deltaX=upcoming.x-pos.x,deltaZ=upcoming.z-pos.z;
         if(Math.hypot(deltaX,deltaZ)>.0001)walker.v.rotation.y=Math.atan2(deltaX,deltaZ);
-        walker.parcel.visible=returning;
+        walker.parcel.visible=worker.job==='hauler'?(phase>.20&&phase<.8):returning;
       }
       walker.leg1.rotation.x=Math.sin(t*6+walker.phase)*.45;
       walker.leg2.rotation.x=-Math.sin(t*6+walker.phase)*.45;

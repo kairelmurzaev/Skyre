@@ -1,3 +1,4 @@
+import {GOODS,HAUL_SIZE,STOCK_LIMITS,buildingStock,storageCapacity,stockUsed,stockedBuildings,inventoryTotals,collectBuilding,supplyBuilding,buildingFree} from './logistics.js';
 import {SAVE_KEY,CROP,BUILD,other,loadGame,saveGame,findAt,buildAt,removeAt,moveAt,rotateAt,received,growth,plant,harvest,harvestOrchard,orchardReady,gather,processBuilding,sendSeed,record,canAfford,GOALS,goalReady,claimGoal} from './core.js';
 import {createScene} from './scene.js';
 import {JOBS,syncWorkers,assignWorker,setAutoCrop,advanceGame,MAX_OFFLINE_MS} from './workers.js';
@@ -14,9 +15,11 @@ const costLabel=cost=>Object.entries(cost).map(([k,v])=>`${v} ${k}`).join(' · '
 const tileInfo=(x,z)=>{
   const b=findAt(game[group],x,z);
   if(!b)return 'Empty tile. Choose Build to create something here.';
+  if(b.type==='plot'&&!b.crop&&buildingStock(b,'wheat')+buildingStock(b,'food')>0)return 'Farm inventory: '+buildingStock(b,'wheat')+' wheat, '+buildingStock(b,'food')+' food awaiting collection or hauling.';
   if(b.type==='plot'&&b.crop){const pct=Math.round(growth(game,group,b)*100);return pct===100?`${CROP[b.crop.kind].name} is ready! Choose Farm and tap to harvest.`:`${CROP[b.crop.kind].name} growing (${pct}%).`}
-  if(b.type==='windmill')return 'Windmill: turn harvested wheat into flour using Craft & Produce.';
-  if(b.type==='bakery')return 'Bakery: transform flour into bread and coins below.';
+  if(b.type==='windmill')return 'Windmill: flour '+buildingStock(b,'flour')+' · wheat '+buildingStock(b,'wheat')+'. Supply it with wheat and assign a miller.';
+  if(b.type==='bakery')return 'Bakery: food '+buildingStock(b,'food')+' · flour '+buildingStock(b,'flour')+'. Supply it and assign a baker.';
+  if(b.type==='warehouse')return 'Storehouse: expands village storage by 64 goods. Haulers make deliveries here.';
   if(b.type==='orchard')return orchardReady(b,Date.now(),received(game,group).breeze)?'Dream Orchard: ripe magical fruit! Tap to collect.':'Dream Orchard: fruit is growing. Return later to collect food and seeds.';
   return `${BUILD[b.type]?.name||b.type}. Choose Remove to reclaim half its building materials.`;
 };
@@ -98,23 +101,24 @@ function renderCatalog(){const el=$('catalog');el.replaceChildren();let items=[]
 function renderProduction(){const el=$('production');el.replaceChildren();const w=game[group];const recipes=[{type:'windmill',title:'🌾 Grind cloud wheat',desc:'3 wheat → 2 flour',needs:{wheat:3}},{type:'bakery',title:'🥖 Bake fresh bread',desc:'2 flour → 6 food + 4 coins',needs:{flour:2}}];
   for(const r of recipes){const btn=document.createElement('button');btn.className='recipe';const built=w.buildings.some(b=>b.type===r.type);const affordable=canAfford(w,r.needs);btn.disabled=!built||!affordable;
     const b=document.createElement('b'),sm=document.createElement('small');b.textContent=r.title;sm.textContent=built?r.desc:'Build a '+BUILD[r.type].name+' to unlock';btn.append(b,sm);
-    btn.onclick=()=>{const err=processBuilding(w,r.type);if(err)return showToast(err);const text=r.type==='windmill'?'Your windmill made 2 flour.':'Your bakery made bread and earned 4 coins.';record(game,`${w.name}: ${text}`);commit(text)};
+    btn.onclick=()=>{const err=processBuilding(w,r.type);if(err)return showToast(err);const text=r.type==='windmill'?'Your windmill made 2 flour in the village stores.':'Your bakery made bread in the village stores and earned 4 coins.';record(game,`${w.name}: ${text}`);commit(text)};
     el.append(btn);
   }
 }
 function workerStatus(world,worker){
   if(worker.job==='idle')return 'Off duty';
   if(!planWorkerRoute(game,group,worker))return 'No reachable workplace · check nearby buildings';
-  if(worker.job==='farmer')return world.buildings.some(b=>b.type==='plot'||b.type==='orchard')?'Working the land':'Needs a plot or orchard';
-  if(worker.job==='miller')return !world.buildings.some(b=>b.type==='windmill')?'Needs a windmill':world.resources.wheat<3?'Waiting for wheat':'Milling';
-  if(worker.job==='baker')return !world.buildings.some(b=>b.type==='bakery')?'Needs a bakery':world.resources.flour<2?'Waiting for flour':'Baking';
-  if(worker.job==='forager')return world.resources.wood>=250&&world.resources.stone>=250?'Storage full':'Gathering supplies';
+  if(worker.job==='farmer')return world.buildings.some(b=>b.type==='plot'||b.type==='orchard')?'Growing and storing harvests':'Needs a plot or orchard';
+  if(worker.job==='miller')return !world.buildings.some(b=>b.type==='windmill')?'Needs a windmill':world.buildings.some(b=>b.type==='windmill'&&buildingStock(b,'wheat')>=3&&buildingFree(b,'flour')>=2)?'Milling':'Waiting for a wheat delivery';
+  if(worker.job==='baker')return !world.buildings.some(b=>b.type==='bakery')?'Needs a bakery':world.buildings.some(b=>b.type==='bakery'&&buildingStock(b,'flour')>=2&&buildingFree(b,'food')>=6)?'Baking':'Waiting for a flour delivery';
+  if(worker.job==='hauler')return planWorkerRoute(game,group,worker)?'Carrying baskets between workplaces':'Waiting for something to deliver';
+  if(worker.job==='forager')return world.resources.wood>=250&&world.resources.stone>=250?'Materials full':'Gathering supplies';
   return 'Working';
 }
 function renderWorkers(){
   const world=game[group],list=$('workers');list.replaceChildren();
   const picker=$('autocrop');picker.value=world.autoCrop;
-  $('worker-summary').textContent=`${world.workers.length} residents · ${world.workers.filter(w=>w.job!=='idle').length} employed · up to ${Math.round(MAX_OFFLINE_MS/3600000)}h of offline progress`;
+  $('worker-summary').textContent=`${world.workers.length} residents · ${world.workers.filter(w=>w.job==='hauler').length} haulers · ${world.workStats?.delivered||0} deliveries · up to ${Math.round(MAX_OFFLINE_MS/3600000)}h offline`;
   $('workers-empty').hidden=world.workers.length>0;
   if(selectedRoute&&!world.workers.some(w=>w.id===selectedRoute))selectedRoute=null;
   for(const worker of world.workers){
@@ -143,6 +147,40 @@ function renderWorkers(){
   const journal=$('worker-journal');journal.replaceChildren();
   for(const activity of (world.workLog.length?world.workLog.slice(0,4):[{text:'Your villagers are settling in. Assign them a job to get started.'}])){
     const row=document.createElement('div');row.className='worker-event';row.textContent=activity.text;journal.append(row);
+  }
+}
+function renderInventory(){
+  const w=game[group],used=stockUsed(w),capacity=storageCapacity(w),totals=inventoryTotals(w);
+  $('store-used').textContent=`${used} / ${capacity}`;
+  $('store-fill').style.width=`${Math.min(100,Math.round(used/capacity*100))}%`;
+  const overview=$('inventory-overview');overview.replaceChildren();
+  for(const good of GOODS){
+    const c=document.createElement('div');c.className='inventory-total';
+    const n=document.createElement('strong'),label=document.createElement('small');
+    n.textContent=totals[good];label.textContent=good+' total · '+(totals[good]-(w.resources[good]||0))+' waiting';
+    c.append(n,label);overview.append(c);
+  }
+  const list=$('inventory-buildings');list.replaceChildren();
+  const stocked=w.buildings.filter(b=>STOCK_LIMITS[b.type]);
+  if(!stocked.length){const note=document.createElement('p');note.className='inventory-empty';note.textContent='Build a garden, orchard or workshop to see its stored goods here.';list.append(note);return;}
+  for(const b of stocked){
+    const row=document.createElement('div');row.className='inventory-building';
+    const info=document.createElement('div');info.className='inventory-building-info';
+    const name=document.createElement('strong');name.textContent=BUILD[b.type].icon+' '+BUILD[b.type].name+' · '+b.x+','+b.z;
+    const stock=document.createElement('small');stock.textContent=Object.keys(STOCK_LIMITS[b.type]).map(g=>`${g} ${buildingStock(b,g)}/${STOCK_LIMITS[b.type][g]}`).join(' · ');
+    info.append(name,stock);row.append(info);
+    const buttons=document.createElement('div');buttons.className='inventory-actions';
+    const hasGoods=GOODS.some(g=>buildingStock(b,g)>0);
+    const collect=document.createElement('button');collect.type='button';collect.textContent='Collect';collect.disabled=!hasGoods||used>=capacity;
+    collect.setAttribute('aria-label','Collect goods from '+BUILD[b.type].name+' at '+b.x+','+b.z);
+    collect.onclick=()=>{const err=collectBuilding(game[group],b.id);if(err)return showToast(err);commit('Goods moved into village storage.')};buttons.append(collect);
+    if(b.type==='windmill'||b.type==='bakery'){
+      const supply=document.createElement('button');supply.type='button';supply.textContent='Supply';
+      const g=b.type==='windmill'?'wheat':'flour';supply.disabled=!w.resources[g]||buildingFree(b,g)===0;
+      supply.setAttribute('aria-label','Supply '+BUILD[b.type].name+' with '+g);
+      supply.onclick=()=>{const err=supplyBuilding(game[group],b.id);if(err)return showToast(err);commit('Supplied workshop with '+g+'.')};buttons.append(supply);
+    }
+    row.append(buttons);list.append(row);
   }
 }
 function renderGoals(){
@@ -186,7 +224,7 @@ function render(){const w=game[group],n=game[other(group)],effects=received(game
   $('turn-mirror').querySelector('small').textContent=w.mirror===2?'Moonbeam is aligned':'Angle '+(w.mirror+1)+'/3 · redirect moonlight';
   $('events').replaceChildren();const recent=game.events.length?game.events.slice(0,5):[{message:'Nothing has stirred the universe yet. Be the first.'}];
   for(const e of recent){const div=document.createElement('div');div.className='event';div.textContent=e.message;if(e.at){const time=document.createElement('time');time.textContent=new Date(e.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});div.append(time)}$('events').append(div)}
-  renderCatalog();renderProduction();renderWorkers();renderLogistics();renderGoals();view?.refresh(game,group,{mode,buildType:chosenBuild,rotation,selectedMove});view?.highlightRoute(selectedRoute);
+  renderCatalog();renderProduction();renderInventory();renderWorkers();renderLogistics();renderGoals();view?.refresh(game,group,{mode,buildType:chosenBuild,rotation,selectedMove});view?.highlightRoute(selectedRoute);
 }
 for(const button of document.querySelectorAll('[data-group]'))button.addEventListener('click',()=>{group=button.dataset.group;selectedMove=null;selectedRoute=null;zoomed=false;view?.setCamera(false);render();showToast(`You entered ${game[group].name}.`)});
 for(const button of document.querySelectorAll('[data-mode]'))button.addEventListener('click',()=>setMode(button.dataset.mode));
