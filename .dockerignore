@@ -1,0 +1,8 @@
+.git
+.data
+.env*
+tests
+*.zip
+patch_*.py
+client_patch.py
+node_modules

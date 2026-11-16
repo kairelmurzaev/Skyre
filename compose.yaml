@@ -1,0 +1,14 @@
+services:
+  skyre:
+    build: .
+    restart: unless-stopped
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:?Set the newly rotated Telegram token in your host environment}
+      DATABASE_PATH: /data/skyre.db
+      PORT: 3000
+    volumes:
+      - skyre_data:/data
+    ports:
+      - "127.0.0.1:3000:3000"
+volumes:
+  skyre_data:

@@ -1,13 +1,56 @@
 import {GOODS,HAUL_SIZE,STOCK_LIMITS,buildingStock,storageCapacity,stockUsed,stockedBuildings,inventoryTotals,collectBuilding,supplyBuilding,buildingFree} from './logistics.js';
-import {SAVE_KEY,CROP,BUILD,other,loadGame,saveGame,findAt,buildAt,removeAt,moveAt,rotateAt,received,growth,plant,harvest,harvestOrchard,orchardReady,gather,processBuilding,sendSeed,record,canAfford,GOALS,goalReady,claimGoal} from './core.js';
+import {newGame,SAVE_KEY,CROP,BUILD,other,loadGame,saveGame,findAt,buildAt,removeAt,moveAt,rotateAt,received,growth,plant,harvest,harvestOrchard,orchardReady,gather,processBuilding,sendSeed,record,canAfford,GOALS,goalReady,claimGoal} from './core.js';
 import {createScene} from './scene.js';
 import {JOBS,syncWorkers,assignWorker,setAutoCrop,advanceGame,MAX_OFFLINE_MS} from './workers.js';
 import {planWorkerRoute,roadSummary,workInterval} from './routing.js';
 
 const $=id=>document.getElementById(id);
-const game=loadGame(localStorage);
-const initialWork=advanceGame(game,Date.now());
-saveGame(localStorage,game);
+const initData=window.Telegram?.WebApp?.initData||'';
+const isLive=initData.length>0;
+let game=isLive?newGame():loadGame(localStorage);
+const initialWork=isLive?{a:{},b:{}}:advanceGame(game,Date.now());
+if(!isLive)saveGame(localStorage,game);
+let liveReady=!isLive, linked=!isLive,looking=false,requestGeneration=0,pendingAction=false;
+
+function installRemote(result){
+  if(!result?.game?.a||!result.game.b)throw Error('Invalid server response.');
+  game=result.game;linked=!!result.linked;looking=!!result.looking;liveReady=true;
+  render();
+}
+async function fetchRemote(){
+  if(!isLive||pendingAction||document.visibilityState==='hidden')return;
+  const generation=++requestGeneration;
+  try{
+    const r=await fetch('/api/world',{headers:{'x-telegram-init-data':initData},cache:'no-store'});
+    const data=await r.json();if(!r.ok)throw Error(data.error||'Unable to load village.');
+    if(generation===requestGeneration&&!pendingAction)installRemote(data);
+    $('network-status').textContent=linked?'● Connected worlds · Live':looking?'◌ Waiting for another group · Live':'● Telegram group village · Live';
+  }catch(e){if(generation===requestGeneration){$('network-status').textContent='⚠ '+e.message;liveReady=false;}}
+}
+async function run(command,localAction,message,after){
+  if(pendingAction)return showToast('Finishing the previous action…');
+  if(isLive){
+    if(!liveReady)return showToast('Unable to connect. Reopen the game from its Telegram group link.');
+    pendingAction=true;requestGeneration++;
+    try{
+      const requestId=crypto.randomUUID();
+      const r=await fetch('/api/action',{method:'POST',headers:{'content-type':'application/json','x-telegram-init-data':initData},body:JSON.stringify({requestId,command})});
+      const data=await r.json();
+      if(data.game)installRemote(data);
+      if(!r.ok)throw Error(data.error||'Action failed.');
+      if(after)after();
+      if(message)showToast(data.message||message);
+    }catch(e){showToast(e.message);}
+    finally{pendingAction=false;}
+  }else{
+    advanceGame(game,Date.now());
+    const error=localAction();if(error)return showToast(error);
+    if(after)after();
+    record(game,`${game[group].name}: ${message}`);
+    commit(message);
+  }
+}
+
 let group='a',mode='explore',chosenBuild='plot',chosenCrop='wheat',rotation=0,zoomed=false,toastTimer,selectedMove=null,selectedRoute=null;
 const entries=[['wood','🪵','Wood'],['stone','◈','Stone'],['seeds','✧','Seeds'],['wheat','🌾','Wheat'],['flour','◌','Flour'],['food','🍞','Food'],['coins','✦','Coins']];
 const showToast=text=>{const el=$('toast');el.textContent=text;el.classList.add('shown');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('shown'),3200)};
@@ -25,52 +68,36 @@ const tileInfo=(x,z)=>{
 };
 let view;
 function onHit(hit){
-  if(hit.kind==='lamp'){toggleLamp();return}
-  if(hit.kind==='mirror'){turnMirror();return}
-  if(hit.kind==='gather'){gatherResource(hit.type);return}
+  if(hit.kind==='lamp')return toggleLamp();
+  if(hit.kind==='mirror')return turnMirror();
+  if(hit.kind==='gather')return gatherResource(hit.type);
   if(hit.kind!=='tile')return;
-  advanceGame(game,Date.now());
-  const {x,z}=hit,w=game[group];let err=null,success='';
+  if(isLive&&!liveReady)return showToast('Connect to your group village first.');
+  const {x,z}=hit,w=game[group],found=findAt(w,x,z);
   if(mode==='move'){
-    const found=findAt(w,x,z);
-    if(!selectedMove){
-      if(!found)return showToast('Choose a building first, then choose where it should move.');
-      selectedMove={x,z};render();showToast(`Selected ${BUILD[found.type]?.name||'building'}. Tap an empty tile to relocate it.`);return;
-    }
-    if(found){
-      selectedMove={x,z};render();showToast('Selected this building instead. Now choose an empty tile.');return;
-    }
-    err=moveAt(w,selectedMove.x,selectedMove.z,x,z);
-    if(!err)selectedMove=null;
-    success='Your building has a lovely new home!';
-  }else if(mode==='build'){
-    err=buildAt(w,chosenBuild,x,z,rotation);
-    success=`Built ${BUILD[chosenBuild].name}. Your village is growing!`;
-  }else if(mode==='demolish'){
-    err=removeAt(w,x,z);success='Building removed. Some materials were recovered.';
-  }else if(mode==='farm'){
-    const b=findAt(w,x,z);
-    if(b?.type==='plot'&&b.crop){err=harvest(game,group,x,z);success=`Harvested ${CROP[b.crop.kind].name}!`}
-    else {err=plant(game,group,x,z,chosenCrop);success=`Planted ${CROP[chosenCrop].name}. Come back as it grows.`}
-  }else{
-    const b=findAt(w,x,z);
-    if(b?.type==='orchard'){
-      err=harvestOrchard(w,x,z,Date.now(),received(game,group).breeze);
-      success='Collected 4 food and a magical seed from the orchard.';
-    }else{showToast(tileInfo(x,z));return}
+    if(!selectedMove){if(!found)return showToast('Select a building to move.');selectedMove={x,z};render();showToast('Choose an empty tile for the building.');return;}
+    if(found){selectedMove={x,z};render();showToast('Selected another building.');return;}
+    const from={...selectedMove};
+    return run({type:'move',fromX:from.x,fromZ:from.z,x,z},()=>moveAt(w,from.x,from.z,x,z),'Moved a building.',()=>{selectedMove=null});
   }
-  if(err){showToast(err);return}
-  record(game,`${w.name}: ${success}`);commit(success);
+  if(mode==='build')return run({type:'build',building:chosenBuild,x,z,rotation},()=>buildAt(w,chosenBuild,x,z,rotation),`Built ${BUILD[chosenBuild].name}.`);
+  if(mode==='demolish')return run({type:'remove',x,z},()=>removeAt(w,x,z),'Removed a building.');
+  if(mode==='farm'){
+    if(found?.type==='plot'&&found.crop)return run({type:'harvest',x,z},()=>harvest(game,group,x,z),`Harvested ${CROP[found.crop.kind].name}.`);
+    return run({type:'plant',x,z,crop:chosenCrop},()=>plant(game,group,x,z,chosenCrop),`Planted ${CROP[chosenCrop].name}.`);
+  }
+  if(found?.type==='orchard')return run({type:'orchard',x,z},()=>harvestOrchard(w,x,z,Date.now(),received(game,group).breeze),'Collected magical fruit.');
+  showToast(tileInfo(x,z));
 }
 try{view=createScene($('scene'),{onHit,getMode:()=>mode})}catch(err){
   $('scene').insertAdjacentHTML('afterbegin','<p style="padding:30px;color:#ffdfb7">Your browser could not start 3D graphics. Try a browser with WebGL enabled.</p>');
   console.error('Skyre WebGL:',err);
 }
-function commit(message){syncWorkers(game[group]);saveGame(localStorage,game);render();if(message)showToast(message)}
-function toggleLamp(){game[group].lamp=!game[group].lamp;const text=game[group].lamp?`Your lamp brought sunrise to ${game[other(group)].name}.`:`Your lamp let night fall over ${game[other(group)].name}.`;record(game,text);commit(text)}
-function turnMirror(){game[group].mirror=(game[group].mirror+1)%3;const text=game[group].mirror===2?`Your moonbeam reached ${game[other(group)].name}.`:'The mirror moved. Two turns may align the moonbeam.';record(game,text);commit(text)}
-function giftSeed(){const err=sendSeed(game,group);if(err)return showToast(err);const text=`You gifted two seeds to ${game[other(group)].name}.`;record(game,text);commit(text)}
-function gatherResource(kind){const err=gather(game[group],kind);if(err)return showToast(err);const text=kind==='wood'?'Gathered 5 wood from the grove.':'Collected 4 stone from the quarry.';record(game,`${game[group].name}: ${text}`);commit(text)}
+function commit(message){syncWorkers(game[group]);if(!isLive)saveGame(localStorage,game);render();if(message)showToast(message)}
+function toggleLamp(){run({type:'lamp'},()=>{game[group].lamp=!game[group].lamp;return null},'Toggled the desk lamp.');}
+function turnMirror(){run({type:'mirror'},()=>{game[group].mirror=(game[group].mirror+1)%3;return null},'Turned the moon mirror.');}
+function giftSeed(){run({type:'seed'},()=>linked?sendSeed(game,group):'Connect with another group before gifting seeds.','Sent seeds to another sky.');}
+function gatherResource(kind){run({type:'gather',kind},()=>gather(game[group],kind),`Gathered ${kind}.`);}
 function setMode(next){mode=next;selectedMove=null;render()}
 function renderCatalog(){const el=$('catalog');el.replaceChildren();let items=[];
   if(mode==='build')items=Object.entries(BUILD).map(([id,v])=>({id,icon:v.icon,title:v.name,sub:costLabel(v.cost),active:id===chosenBuild}));
@@ -92,16 +119,14 @@ function renderCatalog(){const el=$('catalog');el.replaceChildren();let items=[]
   $('rotate-button')?.addEventListener('click',()=>{
     if(mode==='build'){rotation=(rotation+1)%4;render();return}
     if(!selectedMove)return showToast('Select a building to rotate first.');
-    const err=rotateAt(game[group],selectedMove.x,selectedMove.z);
-    if(err)return showToast(err);
-    commit('Rotated the selected building.');
+    run({type:'rotate',x:selectedMove.x,z:selectedMove.z},()=>rotateAt(game[group],selectedMove.x,selectedMove.z),'Rotated the selected building.');
   });
   $('scene-hint').textContent={explore:'Explore: tap a tree or rock to gather',farm:'Farm: tap a plot to plant or harvest',build:'Build: tap a green tile to place',move:selectedMove?'Move: choose an empty destination':'Move: tap any building',demolish:'Remove: tap a building to recycle'}[mode];
 }
 function renderProduction(){const el=$('production');el.replaceChildren();const w=game[group];const recipes=[{type:'windmill',title:'🌾 Grind cloud wheat',desc:'3 wheat → 2 flour',needs:{wheat:3}},{type:'bakery',title:'🥖 Bake fresh bread',desc:'2 flour → 6 food + 4 coins',needs:{flour:2}}];
   for(const r of recipes){const btn=document.createElement('button');btn.className='recipe';const built=w.buildings.some(b=>b.type===r.type);const affordable=canAfford(w,r.needs);btn.disabled=!built||!affordable;
     const b=document.createElement('b'),sm=document.createElement('small');b.textContent=r.title;sm.textContent=built?r.desc:'Build a '+BUILD[r.type].name+' to unlock';btn.append(b,sm);
-    btn.onclick=()=>{const err=processBuilding(w,r.type);if(err)return showToast(err);const text=r.type==='windmill'?'Your windmill made 2 flour in the village stores.':'Your bakery made bread in the village stores and earned 4 coins.';record(game,`${w.name}: ${text}`);commit(text)};
+    btn.onclick=()=>run({type:'craft',building:r.type},()=>processBuilding(w,r.type),r.type==='windmill'?'Milled flour.':'Baked bread.');
     el.append(btn);
   }
 }
@@ -131,7 +156,7 @@ function renderWorkers(){
     const select=document.createElement('select');select.className='job-select';select.setAttribute('aria-label',`Choose a job for ${worker.name}`);
     for(const [id,job] of Object.entries(JOBS)){const option=document.createElement('option');option.value=id;option.textContent=job.icon+' '+job.name;select.append(option)}
     select.value=worker.job;
-    select.addEventListener('change',()=>{const err=assignWorker(game[group],worker.id,select.value,Date.now());if(err)return showToast(err);commit(select.value==='idle'?`${worker.name} is taking a well-earned break.`:`${worker.name} has started working as a ${JOBS[select.value].name.toLowerCase()}.`)});
+    select.addEventListener('change',()=>run({type:'job',workerId:worker.id,job:select.value},()=>assignWorker(game[group],worker.id,select.value,Date.now()),`Updated ${worker.name}'s job.`));
     card.append(portrait,name,select);
     const plan=planWorkerRoute(game,group,worker);
     if(plan){
@@ -173,12 +198,12 @@ function renderInventory(){
     const hasGoods=GOODS.some(g=>buildingStock(b,g)>0);
     const collect=document.createElement('button');collect.type='button';collect.textContent='Collect';collect.disabled=!hasGoods||used>=capacity;
     collect.setAttribute('aria-label','Collect goods from '+BUILD[b.type].name+' at '+b.x+','+b.z);
-    collect.onclick=()=>{const err=collectBuilding(game[group],b.id);if(err)return showToast(err);commit('Goods moved into village storage.')};buttons.append(collect);
+    collect.onclick=()=>run({type:'collect',buildingId:b.id},()=>collectBuilding(game[group],b.id),'Collected goods from a building.');buttons.append(collect);
     if(b.type==='windmill'||b.type==='bakery'){
       const supply=document.createElement('button');supply.type='button';supply.textContent='Supply';
       const g=b.type==='windmill'?'wheat':'flour';supply.disabled=!w.resources[g]||buildingFree(b,g)===0;
       supply.setAttribute('aria-label','Supply '+BUILD[b.type].name+' with '+g);
-      supply.onclick=()=>{const err=supplyBuilding(game[group],b.id);if(err)return showToast(err);commit('Supplied workshop with '+g+'.')};buttons.append(supply);
+      supply.onclick=()=>run({type:'supply',buildingId:b.id},()=>supplyBuilding(game[group],b.id),'Supplied a workshop.');buttons.append(supply);
     }
     row.append(buttons);list.append(row);
   }
@@ -196,8 +221,7 @@ function renderGoals(){
     copy.append(title,desc);card.append(copy);
     const button=document.createElement('button');button.textContent=claimed?'Done':ready?'Claim':'Growing';button.disabled=claimed||!ready;
     button.onclick=()=>{
-      const err=claimGoal(w,goal.id);if(err)return showToast(err);
-      record(game,`${w.name} achieved: ${goal.name}.`);commit('A lovely milestone! '+goal.name+' reward collected.');
+      run({type:'goal',goal:goal.id},()=>claimGoal(w,goal.id),'Claimed the '+goal.name+' reward.');
     };
     card.append(button);el.append(card);
   }
@@ -215,7 +239,11 @@ function render(){const w=game[group],n=game[other(group)],effects=received(game
   $('world-name').textContent=w.name;$('neighbor-name').textContent=n.name;
   $('sky-badge').textContent=effects.sun?'☼ Borrowed sunshine':'☾ Gentle twilight';
   $('villager-count').textContent=w.workers.length+' villagers · '+w.workers.filter(worker=>worker.job!=='idle').length+' working · '+w.buildings.length+' buildings';
-  $('neighbor-details').textContent=`${n.buildings.length} buildings · ${n.resources.food} food`;
+  $('neighbor-details').textContent=isLive&&!linked?'Another group must join to unlock shared weather and seed gifts.':`${n.buildings.length} buildings · ${n.resources.food} food`;
+  $('connection-status').hidden=!isLive;
+  $('connection-text').textContent=linked?'Two Telegram groups are connected!':looking?'Waiting for another Telegram group to find a sky…':'Your village is private until you choose to find a neighbor.';
+  $('find-neighbor').hidden=linked||looking;
+  $('send-seed').disabled=isLive&&!linked;
   $('effect-note').textContent=[effects.sun?'☀ Borrowed sunshine makes crops grow 20% faster.':null,effects.moonbeam?'☾ Their mirror blesses harvests with coins.':null,effects.breeze?'🌬 Their windmill speeds up your Dream Orchards by 20%.':null].filter(Boolean).join(' ')||'✧ Another group can send sunshine, breeze, moonlight, and seeds to your village.';
   $('resources').replaceChildren();for(const [id,icon,label] of entries){const cell=document.createElement('div');cell.className='resource';const num=document.createElement('span'),cap=document.createElement('span');num.className='number';cap.className='caption';num.textContent=icon+' '+(w.resources[id]||0);cap.textContent=label;cell.append(num,cap);$('resources').append(cell)}
   document.querySelectorAll('[data-group]').forEach(btn=>btn.classList.toggle('active',btn.dataset.group===group));
@@ -226,23 +254,29 @@ function render(){const w=game[group],n=game[other(group)],effects=received(game
   for(const e of recent){const div=document.createElement('div');div.className='event';div.textContent=e.message;if(e.at){const time=document.createElement('time');time.textContent=new Date(e.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});div.append(time)}$('events').append(div)}
   renderCatalog();renderProduction();renderInventory();renderWorkers();renderLogistics();renderGoals();view?.refresh(game,group,{mode,buildType:chosenBuild,rotation,selectedMove});view?.highlightRoute(selectedRoute);
 }
-for(const button of document.querySelectorAll('[data-group]'))button.addEventListener('click',()=>{group=button.dataset.group;selectedMove=null;selectedRoute=null;zoomed=false;view?.setCamera(false);render();showToast(`You entered ${game[group].name}.`)});
+for(const button of document.querySelectorAll('[data-group]'))button.addEventListener('click',()=>{if(isLive)return;group=button.dataset.group;selectedMove=null;selectedRoute=null;zoomed=false;view?.setCamera(false);render();showToast(`You entered ${game[group].name}.`)});
 for(const button of document.querySelectorAll('[data-mode]'))button.addEventListener('click',()=>setMode(button.dataset.mode));
-$('autocrop').onchange=()=>{const err=setAutoCrop(game[group],$('autocrop').value);if(err)return showToast(err);commit('Your farmers will now grow '+CROP[game[group].autoCrop].name+'.')};
+$('autocrop').onchange=()=>run({type:'autoCrop',crop:$('autocrop').value},()=>setAutoCrop(game[group],$('autocrop').value),'Updated farming crop.');
 $('toggle-lamp').onclick=toggleLamp;$('turn-mirror').onclick=turnMirror;$('send-seed').onclick=giftSeed;
+$('find-neighbor').onclick=()=>run({type:'connect'},()=>null,'Looking for another group.');
 $('camera-btn').onclick=()=>{zoomed=!zoomed;view?.setCamera(zoomed);$('camera-btn').textContent=zoomed?'⌕ Zoom out':'⌕ Zoom in'};
-$('reset').onclick=()=>{if(!confirm('Reset both demo villages and remove all saved progress in this browser?'))return;localStorage.removeItem(SAVE_KEY);location.reload()};
+$('reset').onclick=()=>{if(isLive)return;if(!confirm('Reset both demo villages and remove all saved progress in this browser?'))return;localStorage.removeItem(SAVE_KEY);location.reload()};
 document.addEventListener('keydown',event=>{if(event.key.toLowerCase()==='r'&&!event.repeat){
   if(mode==='build'){rotation=(rotation+1)%4;render()}
-  else if(mode==='move'&&selectedMove){const err=rotateAt(game[group],selectedMove.x,selectedMove.z);if(!err)commit('Rotated the selected building.')}
+  else if(mode==='move'&&selectedMove){run({type:'rotate',x:selectedMove.x,z:selectedMove.z},()=>rotateAt(game[group],selectedMove.x,selectedMove.z),'Rotated the selected building.');}
 }if(event.key==='Escape'){setMode('explore')}});
 // Crops and workers advance while playing. Offline catch-up happens exactly once on load.
 const offlineActions=Object.values(initialWork).reduce((sum,c)=>sum+Object.values(c).reduce((a,b)=>a+b,0),0);
 if(offlineActions>0)showToast(`Welcome back! Your villagers completed ${offlineActions} jobs while you were away.`);
 window.setInterval(()=>{
+  if(isLive){fetchRemote();return;}
   const counts=advanceGame(game,Date.now());
   saveGame(localStorage,game);
   if(Object.values(counts).some(c=>Object.values(c).some(n=>n>0)))render();
-},2000);
+},isLive?4000:2000);
+$('group-picker').hidden=isLive;
+$('reset').hidden=isLive;
+$('network-status').textContent=isLive?'Connecting to Telegram group…':'LOCAL DEMO · Saves in this browser only';
 render();
+if(isLive)fetchRemote();
 try{window.Telegram?.WebApp?.ready();window.Telegram?.WebApp?.expand()}catch{}

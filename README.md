@@ -1,43 +1,47 @@
-# Someone Else's Sky · v0.5 — The Little Supply Chain
+# Someone Else’s Sky — v0.6, Shared Skies
 
-A cozy 3D village builder with farming, job-based automation, roads, **building inventories**, a **real delivery chain**, and two *simulated* connected worlds. Built for mobile browsers as a future Telegram Mini App.
+A cozy 3D farming/building game where Telegram groups share **real persistent worlds** and can influence a paired group’s sunlight, moonlight and seeds. The farming, local inventories, village workers, roads, hauling and automation from v0.5 remain.
 
-## Run
+## How it works
 
-Requires a modern WebGL-capable browser and internet access for the Three.js CDN. No dependencies or build needed for the playable demo.
+- **Inside a Telegram group:** use a direct link to the bot's Mini App (not a keyboard web_app button). Telegram signs `chat_type`, `chat_instance`, and `user` in `initData`. The Node server verifies that signature and the timestamp **on every request**, and creates a unique persistent world for the verified group. Multiple members of that group edit the **same world**. Never accept a world ID or resources from the browser.
+- **Find a neighbor:** press *Find a neighboring sky*. The server only pairs groups that opt in. When a second group chooses to connect, both groups see the other's game-world state, can gift seeds, and influence weather and orchards. The first group sees the connection within roughly four seconds.
+- **Progress and updates:** the server processes named gameplay commands inside SQLite transactions; it rejects invalid actions and stores worlds on disk. Worker automation and crop growth advance based on server time, including offline catch-up (max four hours). A unique request ID prevents the same successful action from being applied twice after retries. Game clients poll every four seconds for updates.
+- **Ordinary browsers:** open without signed group `initData` to play the original two-world demo saved only in browser `localStorage`. The demo **does not sync** with Telegram. It is intentionally separate from live worlds.
 
-```sh
-python3 -m http.server 8000
-# open http://localhost:8000
-npm test        # Node.js 20+, all deterministic game-logic suites
+## Run and test locally
+
+Requires **Node.js 22.16+** (uses `node:sqlite`; experimental warning on some Node 22 builds), a modern browser with WebGL, and internet access for the pinned Three.js CDN.
+
+```bash
+npm test
+# For backend test: set a valid *new*, private token in your local environment:
+BOT_TOKEN='YOUR_NEW_TOKEN' DATABASE_PATH=.data/skyre.db npm start
 ```
 
-## How to play
+Visit `http://localhost:3000` to try a local demo. To use Telegram group authentication, host this same Node app at a public **HTTPS** address and configure a **direct-link Mini App** in @BotFather. Open the Mini App **from the Telegram group**, not from a private bot chat: Telegram only supplies the signed group context in the direct-link launch. You do **not** need to add the bot as an administrator merely for the Mini App to share state.
 
-1. **Grow:** select Farm, pick Cloud Wheat / Sunroot / Moonflower, tap an empty garden plot. Tap ripe crops to harvest them directly into village stores. Crops continue growing between sessions.
-2. **Build:** select Build, choose a structure, tap a valid empty cell. Build fields, cottages, Stone Paths, a Windmill, a Bakery, an Orchard, and the new **Storehouse**. Move and rotate structures to lay out efficient paths.
-3. **Worker jobs:** each cottage houses two villagers. Assign Farmer, Hauler, Miller, Baker, Forager or Rest in the worker panel.
-4. **Physical inventories:** farmers place wheat or food into their **plot stock**, not directly into the village stores. Orchards also stock fruit locally. The **Hauler** job carries batches of up to four goods from farms or the shared stores to workshops and from workshops back to the stores.
-5. **Local production:** millers consume **3 wheat stored at a windmill** and create **2 flour there**; bakers consume **2 flour stored at a bakery** and make **6 food at the bakery**, plus 4 coins. Haulers complete the chain by delivering flour and bread. No goods are duplicated or teleported between buildings by automated jobs.
-6. **Optional hands-on logistics:** press **Collect** on any stocked building to move available goods into the shared stores, or **Supply** on a workshop to stock it from shared stores. These buttons are intentionally instant for relaxed play. The manual Craft & Produce buttons still work with supplies already in the village stores.
-7. **Storage:** the village begins with **36 shared storage spaces** for *wheat + flour + food combined*. A **Storehouse** adds **64 spaces**. Goods waiting inside production buildings have separate per-building limits. Other materials (wood, stone, seeds and coins) do not count toward this goods cap. Full storage blocks new deposits and manual goods harvests; it never deletes items.
-8. **Paths:** haulers travel along actual shortest routes from home to pickup to drop-off and back. Roads reduce travel time. The route button shows a worker's journey. Grass remains walkable, so roads are a useful improvement rather than a hard requirement.
-9. **Connected worlds:** switch between the simulated villages A and B. Your lamp lights the other village, the mirror gifts moonlight, windmills provide a breeze to their orchards, and you can send seeds. These interactions are local demo mechanics, not cross-device multiplayer.
+### Container deployment
 
-**Suggested first production setup:** Build a Windmill and Bakery, add another Cottage for enough villagers, assign one Farmer, one Hauler, one Miller and one Baker. Add Stone Paths and a Storehouse when space gets tight. Or just farm and decorate at your own pace.
+```bash
+# Set BOT_TOKEN as a secret in your deployment platform, never in source code.
+docker compose up --build -d
+```
 
-## Design and implementation notes
+`compose.yaml` publishes only to local port 3000 for a reverse proxy. Put HTTPS (e.g. Caddy or Nginx) in front of it. The `skyre_data` named volume survives container recreation. **Use one application instance with one persistent SQLite file**; this starter is not configured for stateless scaling across multiple servers. Back up the SQLite file **using SQLite's backup API** or by stopping the server before copying; the game needs persistent storage and a reliable backup policy to avoid data loss.
 
-- `core.js` — deterministic core game rules, upgrades, shared village inventory, migration.
-- `logistics.js` — pure stock tracking, hard capacity checks, planned delivery options and **transactional transfers**. Village stores are pooled across cottages/storehouses for simple player-facing logistics; individual producer stocks are real and must be moved by a hauler or manually.
-- `routing.js` — weighted grid pathfinding, blocked structures, shorter roads, multi-stop hauler routing.
-- `workers.js` — timed production simulation with limited offline catch-up, job scheduling, stock-producing farmers, real mill/bakery stock consumption and atomic hauler transfers.
-- `scene.js` — procedural Three.js world, warehouse model, visible stock crates, job-colored villagers and route-following movement.
-- `app.js`, `index.html`, `style.css` — inventory dashboard, building controls, production actions, village panels and mobile layout.
-- `tests/*.test.mjs` — regression, migration, routing, inventory conservation, capacity and full production-chain tests.
+**Do not use GitHub Pages for the live game.** GitHub Pages can display the local demo but cannot run this backend or persist group worlds. Hosting secrets need `BOT_TOKEN`; optional settings: `DATABASE_PATH` (default `.data/skyre.db`) and `PORT` (default 3000). There are **no bot credentials committed to the repository**. Rotate any token previously pasted in a chat, and never paste the replacement into source control.
 
-Existing `skyre-village-v1` browser saves migrate in place; new building stock defaults to empty. All persistent data currently lives in each browser's `localStorage`, so **there is no real Telegram login, shared server database or cross-device world syncing**. A later multiplayer milestone must validate Telegram Mini App `initData` on the backend and implement server-authoritative game mutations. Never commit bot credentials.
+### Important limits
 
-### Scope limitations
+This is a tested multiplayer **MVP**, not a production launch certification. There is no bot webhook or push notification system (the game uses same-origin polling), no moderation or ownership roles within groups, no friend-pairing codes, and no transfer of old **local demo saves** to server worlds. Automatic pairing is opt-in and matches the oldest waiting group; it is not a private invitation system. The single SQLite host still needs proper operations (TLS proxy, monitoring, volume snapshots/backups and uptime). Security tests cover signed init data, group isolation, duplicate requests, malicious payloads, and transactional persistence; full 3D graphics and cross-device Telegram launch must be manually smoke-tested on real devices after deployment.
 
-The demo uses CDN-hosted Three.js and has not been cross-browser performance tested on real phones. Work routes and production are simulated in deterministic timer steps, not with individual animated physical items. Shared village stores are a single pooled depot inventory even if multiple storehouses exist. These are deliberate prototype simplifications, not a secure multiplayer economy.
+## Architecture
+
+- `core.js`, `workers.js`, `routing.js`, `logistics.js`: shared deterministic rules; the server executes all mutating commands.
+- `server/auth.js`: bot-token HMAC validation; group identity comes solely from verified Telegram context.
+- `server/actions.js`: small allowlisted command protocol with input validation.
+- `server/db.js`: WAL-mode SQLite storage, serialized transactions, opt-in group matchmaking, replay protection.
+- `server/http.js`: same-origin static files and `GET /api/world`, `POST /api/action`, `GET /api/health`.
+- `app.js`: local demo or signed live group with server polling and no client-side live saves.
+- `tests/`: deterministic rules and backend security/integration tests (`npm test`).

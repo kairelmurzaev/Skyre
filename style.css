@@ -61,3 +61,9 @@
 .inventory-actions button:disabled{opacity:.3;cursor:not-allowed}
 .inventory-tip,.inventory-empty{font-size:11px;color:#a9c5cf;line-height:1.6}
 @media(max-width:480px){.inventory-building{align-items:flex-start;flex-direction:column}.inventory-actions{width:100%}.inventory-actions button{flex:1}}
+
+/* Group multiplayer connection indicator */
+.connection-banner{margin:0 0 16px;border-radius:10px;background:#18334a;color:#e8d9b8;padding:11px 16px;font-size:12px;letter-spacing:.3px;border:1px solid #567c7b66}
+.connection-panel{background:#1a3148;border:1px solid #6c9b9b55;border-radius:13px;padding:14px;margin:12px 0 18px;font-size:12px;line-height:1.5}
+.connection-panel p{margin:0 0 9px;color:#cbd9e8}.connection-panel button{padding:10px 12px;color:#182436;background:#f1dcb2;border:0;border-radius:8px;cursor:pointer;font-weight:700}
+.connection-panel[hidden],[hidden]{display:none!important}
