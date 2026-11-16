@@ -122,3 +122,15 @@ test('invalid worker jobs and missing workers cannot be assigned',()=>{
   assert.match(assignWorker(game.a,game.a.workers[0].id,'wizard',now),/valid/);
   assert.equal(Object.keys(JOBS).length,5);
 });
+
+
+test('large villages do not replay missed cycles after safety limit',()=>{
+  const {game,now}=setup();const w=game.a;w.resources.wood=1500;w.resources.stone=1500;
+  const sites=[[2,1],[2,2],[-3,-1],[-3,1],[1,3],[3,1],[0,-3]];
+  for(const [x,z] of sites)assert.equal(buildAt(w,'cottage',x,z),null);
+  syncWorkers(w,now);assert.equal(w.workers.length,16);
+  for(const worker of w.workers)assignWorker(w,worker.id,'farmer',now);
+  advanceGame(game,now+MAX_OFFLINE_MS);
+  assert.ok(w.workers.every(v=>v.nextAt>now+MAX_OFFLINE_MS));
+  assert.equal(count(advanceGame(game,now+MAX_OFFLINE_MS+1000).a),0);
+});

@@ -109,6 +109,13 @@ export function advanceGame(game,now=Date.now()){
       const action=doWork(game,id,ready,at);
       if(action){counts[id][action]++;addLog(world,ready,action,at);}
     }
+    // If the safety budget was exhausted, discard remaining past-due cycles.
+    // Otherwise players with huge villages could receive the same offline backlog repeatedly.
+    if(safety>12000){
+      for(const worker of world.workers){
+        if(worker.nextAt<=now)worker.nextAt=now+JOBS[worker.job].ms;
+      }
+    }
     world.simulatedAt=now;
   }
   return counts;
