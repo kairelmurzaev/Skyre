@@ -90,12 +90,14 @@ test('backend serves the exact model and loader without exposing source tools',a
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise(resolve=>server.close(resolve)));
   const base=`http://127.0.0.1:${server.address().port}`;
-  const [model,loader,tool]=await Promise.all([
-    fetch(base+'/assets/characters/skyre-villager.glb'),fetch(base+'/rigged-characters.js'),fetch(base+'/tools/build_villager.py')
+  const [model,loader,tool,studio]=await Promise.all([
+    fetch(base+'/assets/characters/skyre-villager.glb'),fetch(base+'/rigged-characters.js'),fetch(base+'/tools/build_villager.py'),fetch(base+'/character-studio.html')
   ]);
   assert.equal(model.status,200);
   assert.match(model.headers.get('content-type'),/model\/gltf-binary/);
   assert.equal((await model.arrayBuffer()).byteLength,bytes.length);
   assert.equal(loader.status,200);
+  assert.equal(studio.status,200);
+  assert.match(await studio.text(),/Character Studio/);
   assert.equal(tool.status,404);
 });

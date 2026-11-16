@@ -16,7 +16,7 @@ Run `python tools/build_villager.py` with Python, NumPy, SciPy and Pillow availa
 
 ## Performance and quality boundaries
 
-The 1.7 MB GLB is downloaded once, and each resident reuses geometry while receiving unique skeletons and materials. The five bone-driven animations are animated in real time. It is a **proper skinned, rigged character**, but it is still stylized procedural modeling, *not* a professional character scan or a literal reconstruction of every detail in the concept illustration. It should be tested for frame rate, shadows, clipping and touch controls on real phones. The multiplayer server, farming and inventory rules are unchanged.
+The approximately 1.3 MB GLB is downloaded once, and each resident reuses geometry while receiving unique skeletons and materials. The five bone-driven animations are animated in real time. It is a **proper skinned, rigged character**, but it is still stylized procedural modeling, *not* a professional character scan or a literal reconstruction of every detail in the concept illustration. It should be tested for frame rate, shadows, clipping and touch controls on real phones. The multiplayer server, farming and inventory rules are unchanged.
 
 ## Verification
 

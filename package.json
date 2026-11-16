@@ -9,7 +9,7 @@
     "start": "node server/index.js",
     "dev": "node server/index.js",
     "preview": "python3 -m http.server 8000",
-    "check": "node --check app.js && node --check core.js && node --check scene.js && node --check rigged-characters.js && node --check characters.js && node --check character-design.js && node --check workers.js && node --check routing.js && node --check logistics.js && node --check terrain.js && node --check server/auth.js && node --check server/actions.js && node --check server/db.js && node --check server/http.js && node --check server/index.js"
+    "check": "node --check app.js && node --check core.js && node --check scene.js && node --check rigged-characters.js && node --check character-studio.js && node --check characters.js && node --check character-design.js && node --check workers.js && node --check routing.js && node --check logistics.js && node --check terrain.js && node --check server/auth.js && node --check server/actions.js && node --check server/db.js && node --check server/http.js && node --check server/index.js"
   },
   "engines": {
     "node": ">=22.16.0"
