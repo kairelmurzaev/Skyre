@@ -1,37 +1,52 @@
-# Someone Else's Sky — Living Worlds · Milestone 1.5
+# Someone Else’s Sky — Living Worlds · v0.3
 
-A cozy 3D farming-and-building game where every Telegram group's village will eventually live inside someone else's miniature world.
+A cozy **3D farming and village-building game** in which every group’s island is tied to another world inside a glass globe. This is a static, single-browser playable prototype, **not a deployed Telegram multiplayer bot**.
 
-## Running the prototype
-
-Start a static HTTP server in this folder:
+## Play locally
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Visit `http://localhost:8000`. Three.js is loaded from a CDN, so the browser needs an internet connection and WebGL. Run logic tests with `npm test` (Node.js 20+).
+Open **http://localhost:8000** in a modern browser with WebGL and internet access. Three.js loads from a CDN; there is no build step. Automated game-rule tests: `npm test` (Node.js 20+).
 
-## How to play
+## Features
 
-1. **Explore:** drag to orbit, scroll/pinch to zoom, tap trees and rocks for building materials. Resource nodes replenish every 12 seconds. Tap a ripe Dream Orchard to collect fruit and seeds.
-2. **Farm:** choose Cloud Wheat, Sunroot or Moonflower, then tap an empty garden plot. Plants visibly grow and sway, even when the game was closed, and become harvestable at maturity.
-3. **Build:** select a structure and tap a highlighted tile. A translucent silhouette previews its footprint when you hover; green is available and affordable, red is occupied/unaffordable. Press R or tap Rotate to turn a preview. New: a Dream Orchard produces 4 food and 1 seed every 90 seconds; tap it in Explore to collect.
-4. **Move:** select a placed building then an empty tile. Moving is free, and crops inside a moved plot keep their growth progress. Press R or use Rotate to turn the selected building.
-5. **Remove:** reclaim half a building's original materials.
-6. **Produce:** grow wheat, process 3 wheat into 2 flour at a windmill, and convert 2 flour into 6 food and 4 coins at a bakery.
-7. **Village goals:** optionally claim one-time rewards for harvesting, expanding your village, unlocking the production chain and helping your neighboring world.
-8. **Connect worlds:** group A and B are simulated in this browser. Your lamp affects their crop sunlight, your moon mirror gives them harvest bonuses, and you can gift their world seeds.
+- **Explore:** rotate the 3D island, zoom, collect wood and stone from trees/rocks.
+- **Farm:** plant Cloud Wheat, Sunroot, and Moonflower in garden plots. Crops grow while you're away.
+- **Build:** choose structures, preview valid/invalid tiles, rotate with R or the UI, move structures without losing their crops, and recycle materials.
+- **Production:** grind 3 wheat into 2 flour at a windmill, then bake 2 flour into 6 food and 4 coins at a bakery. Manual production remains available even without employed villagers.
+- **Dream Orchard:** periodically produces food and magical seeds. A windmill in the other group brings a breeze that makes the orchard mature **20% faster**.
+- **Connected worlds:** Group A/B simulation, gifts of seeds, sunlight growth bonuses and moonlight harvest bonuses. The other world is available even if nobody is online.
+- **Goals:** optional milestones provide resources. There is no energy timer or paid shortcut.
 
-## Changes in 1.5
+## New in v0.3 — Little Hands, Big Dreams
 
-- Moving villagers (two per cottage, up to six), ambient chimney smoke, continuously turning windmill sails and live crop animation.
-- Red/green construction preview, move-and-rotate mode, orchard and four gentle milestone goals.
-- Better legacy save migration: previously saved villages stay intact and receive new progress defaults.
-- Twelve deterministic core rule tests.
+Every cottage houses **two villagers**. The first cottage starts with a **farmer** and **forager**; additional cottages add residents who are initially off duty. In the **Little hands, big dreams** section, choose a job per resident:
 
-## Current boundaries
+| Job | What happens automatically | Interval |
+| --- | --- | --- |
+| Farmer | Plants your selected crop in an empty plot; harvests ripe crops or a Dream Orchard | 12s |
+| Miller | Processes wheat into flour when a windmill is built | 20s |
+| Baker | Bakes bread and earns coins when a bakery is built and flour is available | 24s |
+| Forager | Adds 3 wood + 2 stone up to 250 each in automated storage | 28s |
+| Rest | Enjoys the village without gathering or crafting | — |
 
-Villagers are currently **visual ambience**, not automated workers. The connected worlds share local browser state only; this is **not yet multiplayer or Telegram group authentication**. All game state is saved to `localStorage` under `skyre-village-v1`; resetting clears that local data. Grow times are timestamp based.
+Workers visibly move toward the type of building they serve and wear role-specific clothes. Jobs use the village's shared inventory: **logistics paths and physically carrying goods are not implemented yet**. Work is simulated chronologically by the browser and stored in localStorage. When you reopen the game, it catches up for **up to four hours**; this protects the small prototype economy from extreme accumulation. Each village has a local work journal and saved job assignments.
 
-Before real Telegram group launch, implement server-authoritative world state, authenticated actions with validated Telegram `initData`, persistence in a database and safe cross-world permission checks. Never ship a bot token or secret to client-side code.
+You can manually build, plant, harvest, craft, or gather at any time, even with no workers assigned. Saving, migration of earlier `skyre-village-v1` saves, and offline simulation have automated tests.
+
+## Security and Telegram scope
+
+**No bot token is used, saved or required in this repository.** This prototype stores both simulated groups in one browser's `localStorage`. Switching groups is for development testing, **not authentication**. This game is not yet synchronized between devices or connected to actual Telegram groups.
+
+For real Telegram play, add a backend and database; validate Telegram `initData` server-side; use trusted group context; authorize cross-world actions; enforce rate limits and transactional inventory updates. Store any future bot credential only in private server-side environment secrets, never in public code or client-side JavaScript.
+
+## Source layout
+
+- `core.js`: farming/building/resources/world-link game rules
+- `workers.js`: worker roster, jobs, offline production simulator
+- `scene.js`: procedural Three.js island and villagers
+- `app.js`: interface, inventories, worker assignment, save wiring
+- `index.html` and `style.css`: mobile-friendly UI
+- `tests/*.test.mjs`: deterministic game-rule regression tests

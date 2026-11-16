@@ -24,7 +24,8 @@ const initialWorld=(id)=>({
     {id:id+'-field2',type:'plot',x:-1,z:0,rotation:0,crop:null},
     {id:id+'-field3',type:'plot',x:-2,z:1,rotation:0,crop:null}
   ],
-  lamp:false,mirror:0,harvestedAt:{wood:0,stone:0},nextId:1,progress:{harvests:0,gifts:0,claimed:[]}
+  lamp:false,mirror:0,harvestedAt:{wood:0,stone:0},nextId:1,progress:{harvests:0,gifts:0,claimed:[]},
+  workers:[],autoCrop:'wheat',workLog:[],workStats:{},simulatedAt:Date.now()
 });
 export const newGame=()=>({version:1,a:initialWorld('a'),b:initialWorld('b'),events:[]});
 export function loadGame(storage){
@@ -77,7 +78,7 @@ export function removeAt(world,x,z){
   for(const [name,n] of Object.entries(cost))world.resources[name]=(world.resources[name]||0)+Math.floor(n/2);
   world.buildings=world.buildings.filter(v=>v!==b);return null;
 }
-export function received(game,id){return {sun:!!game[other(id)].lamp,moonbeam:game[other(id)].mirror===2};}
+export function received(game,id){const neighbor=game[other(id)];return {sun:!!neighbor.lamp,moonbeam:neighbor.mirror===2,breeze:neighbor.buildings.some(b=>b.type==='windmill')};}
 export function growTime(game,id,crop){return CROP[crop].ms*(received(game,id).sun?.8:1);}
 export function growth(game,id,building,now=Date.now()){
   if(!building?.crop||!CROP[building.crop.kind])return 0;
@@ -124,13 +125,13 @@ export function sendSeed(game,id){
   return null;
 }
 export const ORCHARD_MS=90000;
-export function orchardReady(building,now=Date.now()){
-  return building?.type==='orchard'&&now-(building.harvestedAt??building.placedAt??now)>=ORCHARD_MS;
+export function orchardReady(building,now=Date.now(),breeze=false){
+  return building?.type==='orchard'&&now-(building.harvestedAt??building.placedAt??now)>=ORCHARD_MS*(breeze?.8:1);
 }
-export function harvestOrchard(world,x,z,now=Date.now()){
+export function harvestOrchard(world,x,z,now=Date.now(),breeze=false){
   const b=findAt(world,x,z);
   if(!b||b.type!=='orchard')return 'Choose a Dream Orchard.';
-  if(!orchardReady(b,now))return 'The orchard needs more time to grow fruit.';
+  if(!orchardReady(b,now,breeze))return 'The orchard needs more time to grow fruit.';
   b.harvestedAt=now;
   world.resources.food+=4;world.resources.seeds+=1;
   return null;
@@ -139,13 +140,15 @@ export const GOALS=[
   {id:'harvest',name:'A gentle harvest',description:'Harvest your first crop',reward:{wood:8,seeds:3}},
   {id:'village',name:'A village takes shape',description:'Have at least 6 buildings',reward:{stone:12,coins:8}},
   {id:'bakery',name:'Bread for everyone',description:'Build a windmill and bakery',reward:{wood:12,coins:12}},
-  {id:'neighbors',name:'Across the glass',description:'Send a seed to another world',reward:{seeds:6,coins:8}}
+  {id:'neighbors',name:'Across the glass',description:'Send a seed to another world',reward:{seeds:6,coins:8}},
+  {id:'working',name:'Helping hands',description:'Let villagers complete 10 useful jobs',reward:{wood:10,stone:10,coins:14}}
 ];
 export function goalReady(world,id){
   if(id==='harvest')return (world.progress?.harvests||0)>=1;
   if(id==='village')return world.buildings.length>=6;
   if(id==='bakery')return ['windmill','bakery'].every(t=>world.buildings.some(b=>b.type===t));
   if(id==='neighbors')return (world.progress?.gifts||0)>=1;
+  if(id==='working')return Object.values(world.workStats||{}).reduce((sum,n)=>sum+(Number(n)||0),0)>=10;
   return false;
 }
 export function claimGoal(world,id){

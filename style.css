@@ -12,3 +12,19 @@
 .goal button:disabled{cursor:default;opacity:.5}
 .goal.ready button{background:#e6ce9e;color:#1e2d3c;opacity:1}
 @media(max-width:540px){.tabs button{padding:9px 11px}.goal{padding:10px}}
+
+/* V0.3: worker assignment and village journal. */
+.section-description{color:#b9c8d6;font-size:12px;line-height:1.7;margin:0 0 17px}
+.crew-tag{font-size:9px;font-weight:800;letter-spacing:1px;color:#d7bf8e;background:#3d4b50;border:1px solid #877b60;border-radius:18px;padding:7px 9px}
+.workers-controls{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #68818a66;border-radius:12px;padding:12px 13px;background:#152b38;margin-bottom:13px}
+.workers-controls label{font-size:11px;color:#d3dfdf}
+.workers-controls select,.job-select{font-size:11px;color:#f3ead8;background:#293b52;border:1px solid #68829b;border-radius:9px;padding:9px 8px;cursor:pointer;min-width:0}
+.worker-summary{font-size:11px;color:#9fb5bf;margin-bottom:11px}
+.workers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.worker-card{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid #60758d66;border-radius:13px;background:#24354b;min-width:0}
+.worker-portrait{display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:50%;font-size:18px;background:#3b5660;border:1px solid #baad89}
+.worker-name{min-width:0;flex:1}.worker-name strong{display:block;font-size:12px}.worker-name small{display:block;color:#a9c1cd;font-size:10px;line-height:1.4;margin-top:4px}
+.job-select{max-width:122px;width:42%;flex:none}
+.worker-log-title{color:#c6c5ad;font-size:9px;font-weight:800;letter-spacing:1.7px;margin-top:19px;margin-bottom:9px}
+.worker-journal{display:flex;flex-direction:column;gap:5px}.worker-event{font-size:11px;color:#a9c7ca;padding:9px 11px;background:#152638;border-left:2px solid #a8bd9c;border-radius:4px;line-height:1.4}
+@media(max-width:560px){.workers{grid-template-columns:1fr}.job-select{width:43%;max-width:170px}.workers-controls{flex-wrap:wrap}.workers-controls select{flex:1}}

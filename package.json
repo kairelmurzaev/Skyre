@@ -1,8 +1,11 @@
 {
-  "name":"someone-elses-sky",
-  "version":"0.2.0",
-  "private":true,
-  "type":"module",
-  "description":"Cozy 3D farming and building game prototype for connected Telegram worlds",
-  "scripts":{"test":"node --test tests/*.test.mjs","dev":"python3 -m http.server 8000"}
+  "name": "someone-elses-sky",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Cozy 3D farming, villager jobs, and connected Telegram worlds prototype",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "dev": "python3 -m http.server 8000"
+  }
 }

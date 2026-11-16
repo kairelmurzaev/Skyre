@@ -1,8 +1,11 @@
 import {SAVE_KEY,CROP,BUILD,other,loadGame,saveGame,findAt,buildAt,removeAt,moveAt,rotateAt,received,growth,plant,harvest,harvestOrchard,orchardReady,gather,processBuilding,sendSeed,record,canAfford,GOALS,goalReady,claimGoal} from './core.js';
 import {createScene} from './scene.js';
+import {JOBS,syncWorkers,assignWorker,setAutoCrop,advanceGame,MAX_OFFLINE_MS} from './workers.js';
 
 const $=id=>document.getElementById(id);
 const game=loadGame(localStorage);
+const initialWork=advanceGame(game,Date.now());
+saveGame(localStorage,game);
 let group='a',mode='explore',chosenBuild='plot',chosenCrop='wheat',rotation=0,zoomed=false,toastTimer,selectedMove=null;
 const entries=[['wood','🪵','Wood'],['stone','◈','Stone'],['seeds','✧','Seeds'],['wheat','🌾','Wheat'],['flour','◌','Flour'],['food','🍞','Food'],['coins','✦','Coins']];
 const showToast=text=>{const el=$('toast');el.textContent=text;el.classList.add('shown');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('shown'),3200)};
@@ -13,7 +16,7 @@ const tileInfo=(x,z)=>{
   if(b.type==='plot'&&b.crop){const pct=Math.round(growth(game,group,b)*100);return pct===100?`${CROP[b.crop.kind].name} is ready! Choose Farm and tap to harvest.`:`${CROP[b.crop.kind].name} growing (${pct}%).`}
   if(b.type==='windmill')return 'Windmill: turn harvested wheat into flour using Craft & Produce.';
   if(b.type==='bakery')return 'Bakery: transform flour into bread and coins below.';
-  if(b.type==='orchard')return orchardReady(b)?'Dream Orchard: ripe magical fruit! Tap to collect.':'Dream Orchard: fruit is growing. Return later to collect food and seeds.';
+  if(b.type==='orchard')return orchardReady(b,Date.now(),received(game,group).breeze)?'Dream Orchard: ripe magical fruit! Tap to collect.':'Dream Orchard: fruit is growing. Return later to collect food and seeds.';
   return `${BUILD[b.type]?.name||b.type}. Choose Remove to reclaim half its building materials.`;
 };
 let view;
@@ -22,6 +25,7 @@ function onHit(hit){
   if(hit.kind==='mirror'){turnMirror();return}
   if(hit.kind==='gather'){gatherResource(hit.type);return}
   if(hit.kind!=='tile')return;
+  advanceGame(game,Date.now());
   const {x,z}=hit,w=game[group];let err=null,success='';
   if(mode==='move'){
     const found=findAt(w,x,z);
@@ -47,7 +51,7 @@ function onHit(hit){
   }else{
     const b=findAt(w,x,z);
     if(b?.type==='orchard'){
-      err=harvestOrchard(w,x,z);
+      err=harvestOrchard(w,x,z,Date.now(),received(game,group).breeze);
       success='Collected 4 food and a magical seed from the orchard.';
     }else{showToast(tileInfo(x,z));return}
   }
@@ -58,7 +62,7 @@ try{view=createScene($('scene'),{onHit,getMode:()=>mode})}catch(err){
   $('scene').insertAdjacentHTML('afterbegin','<p style="padding:30px;color:#ffdfb7">Your browser could not start 3D graphics. Try a browser with WebGL enabled.</p>');
   console.error('Skyre WebGL:',err);
 }
-function commit(message){saveGame(localStorage,game);render();if(message)showToast(message)}
+function commit(message){syncWorkers(game[group]);saveGame(localStorage,game);render();if(message)showToast(message)}
 function toggleLamp(){game[group].lamp=!game[group].lamp;const text=game[group].lamp?`Your lamp brought sunrise to ${game[other(group)].name}.`:`Your lamp let night fall over ${game[other(group)].name}.`;record(game,text);commit(text)}
 function turnMirror(){game[group].mirror=(game[group].mirror+1)%3;const text=game[group].mirror===2?`Your moonbeam reached ${game[other(group)].name}.`:'The mirror moved. Two turns may align the moonbeam.';record(game,text);commit(text)}
 function giftSeed(){const err=sendSeed(game,group);if(err)return showToast(err);const text=`You gifted two seeds to ${game[other(group)].name}.`;record(game,text);commit(text)}
@@ -97,6 +101,37 @@ function renderProduction(){const el=$('production');el.replaceChildren();const 
     el.append(btn);
   }
 }
+function workerStatus(world,worker){
+  if(worker.job==='idle')return 'Off duty';
+  if(worker.job==='farmer')return world.buildings.some(b=>b.type==='plot'||b.type==='orchard')?'Working the land':'Needs a plot or orchard';
+  if(worker.job==='miller')return !world.buildings.some(b=>b.type==='windmill')?'Needs a windmill':world.resources.wheat<3?'Waiting for wheat':'Milling';
+  if(worker.job==='baker')return !world.buildings.some(b=>b.type==='bakery')?'Needs a bakery':world.resources.flour<2?'Waiting for flour':'Baking';
+  if(worker.job==='forager')return world.resources.wood>=250&&world.resources.stone>=250?'Storage full':'Gathering supplies';
+  return 'Working';
+}
+function renderWorkers(){
+  const world=game[group],list=$('workers');list.replaceChildren();
+  const picker=$('autocrop');picker.value=world.autoCrop;
+  $('worker-summary').textContent=`${world.workers.length} residents · ${world.workers.filter(w=>w.job!=='idle').length} employed · up to ${Math.round(MAX_OFFLINE_MS/3600000)}h of offline progress`;
+  $('workers-empty').hidden=world.workers.length>0;
+  for(const worker of world.workers){
+    const card=document.createElement('div');card.className='worker-card';
+    const portrait=document.createElement('span');portrait.className='worker-portrait';portrait.textContent=JOBS[worker.job].icon;
+    const name=document.createElement('div');name.className='worker-name';
+    const title=document.createElement('strong');title.textContent=worker.name;
+    const status=document.createElement('small');status.textContent=workerStatus(world,worker);
+    name.append(title,status);
+    const select=document.createElement('select');select.className='job-select';select.setAttribute('aria-label',`Choose a job for ${worker.name}`);
+    for(const [id,job] of Object.entries(JOBS)){const option=document.createElement('option');option.value=id;option.textContent=job.icon+' '+job.name;select.append(option)}
+    select.value=worker.job;
+    select.addEventListener('change',()=>{const err=assignWorker(game[group],worker.id,select.value,Date.now());if(err)return showToast(err);commit(select.value==='idle'?`${worker.name} is taking a well-earned break.`:`${worker.name} has started working as a ${JOBS[select.value].name.toLowerCase()}.`)});
+    card.append(portrait,name,select);list.append(card);
+  }
+  const journal=$('worker-journal');journal.replaceChildren();
+  for(const activity of (world.workLog.length?world.workLog.slice(0,4):[{text:'Your villagers are settling in. Assign them a job to get started.'}])){
+    const row=document.createElement('div');row.className='worker-event';row.textContent=activity.text;journal.append(row);
+  }
+}
 function renderGoals(){
   const el=$('goals');el.replaceChildren();
   const w=game[group];
@@ -119,9 +154,9 @@ function renderGoals(){
 function render(){const w=game[group],n=game[other(group)],effects=received(game,group);
   $('world-name').textContent=w.name;$('neighbor-name').textContent=n.name;
   $('sky-badge').textContent=effects.sun?'☼ Borrowed sunshine':'☾ Gentle twilight';
-  $('villager-count').textContent=Math.min(6,Math.max(1,w.buildings.filter(b=>b.type==='cottage').length*2))+' villagers wandering · '+w.buildings.length+' buildings';
+  $('villager-count').textContent=w.workers.length+' villagers · '+w.workers.filter(worker=>worker.job!=='idle').length+' working · '+w.buildings.length+' buildings';
   $('neighbor-details').textContent=`${n.buildings.length} buildings · ${n.resources.food} food`;
-  $('effect-note').textContent=effects.sun?'☀ The other group is lighting your farms: crops grow 20% faster.':effects.moonbeam?'☾ Their moonbeam blesses your harvests with extra coins.':'✧ Another group can send sunlight, moonlight, and seeds to your village.';
+  $('effect-note').textContent=[effects.sun?'☀ Borrowed sunshine makes crops grow 20% faster.':null,effects.moonbeam?'☾ Their mirror blesses harvests with coins.':null,effects.breeze?'🌬 Their windmill speeds up your Dream Orchards by 20%.':null].filter(Boolean).join(' ')||'✧ Another group can send sunshine, breeze, moonlight, and seeds to your village.';
   $('resources').replaceChildren();for(const [id,icon,label] of entries){const cell=document.createElement('div');cell.className='resource';const num=document.createElement('span'),cap=document.createElement('span');num.className='number';cap.className='caption';num.textContent=icon+' '+(w.resources[id]||0);cap.textContent=label;cell.append(num,cap);$('resources').append(cell)}
   document.querySelectorAll('[data-group]').forEach(btn=>btn.classList.toggle('active',btn.dataset.group===group));
   document.querySelectorAll('[data-mode]').forEach(btn=>btn.classList.toggle('active',btn.dataset.mode===mode));
@@ -129,10 +164,11 @@ function render(){const w=game[group],n=game[other(group)],effects=received(game
   $('turn-mirror').querySelector('small').textContent=w.mirror===2?'Moonbeam is aligned':'Angle '+(w.mirror+1)+'/3 · redirect moonlight';
   $('events').replaceChildren();const recent=game.events.length?game.events.slice(0,5):[{message:'Nothing has stirred the universe yet. Be the first.'}];
   for(const e of recent){const div=document.createElement('div');div.className='event';div.textContent=e.message;if(e.at){const time=document.createElement('time');time.textContent=new Date(e.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});div.append(time)}$('events').append(div)}
-  renderCatalog();renderProduction();renderGoals();view?.refresh(game,group,{mode,buildType:chosenBuild,rotation,selectedMove});
+  renderCatalog();renderProduction();renderWorkers();renderGoals();view?.refresh(game,group,{mode,buildType:chosenBuild,rotation,selectedMove});
 }
 for(const button of document.querySelectorAll('[data-group]'))button.addEventListener('click',()=>{group=button.dataset.group;selectedMove=null;zoomed=false;view?.setCamera(false);render();showToast(`You entered ${game[group].name}.`)});
 for(const button of document.querySelectorAll('[data-mode]'))button.addEventListener('click',()=>setMode(button.dataset.mode));
+$('autocrop').onchange=()=>{const err=setAutoCrop(game[group],$('autocrop').value);if(err)return showToast(err);commit('Your farmers will now grow '+CROP[game[group].autoCrop].name+'.')};
 $('toggle-lamp').onclick=toggleLamp;$('turn-mirror').onclick=turnMirror;$('send-seed').onclick=giftSeed;
 $('camera-btn').onclick=()=>{zoomed=!zoomed;view?.setCamera(zoomed);$('camera-btn').textContent=zoomed?'⌕ Zoom out':'⌕ Zoom in'};
 $('reset').onclick=()=>{if(!confirm('Reset both demo villages and remove all saved progress in this browser?'))return;localStorage.removeItem(SAVE_KEY);location.reload()};
@@ -140,6 +176,13 @@ document.addEventListener('keydown',event=>{if(event.key.toLowerCase()==='r'&&!e
   if(mode==='build'){rotation=(rotation+1)%4;render()}
   else if(mode==='move'&&selectedMove){const err=rotateAt(game[group],selectedMove.x,selectedMove.z);if(!err)commit('Rotated the selected building.')}
 }if(event.key==='Escape'){setMode('explore')}});
-// Crop progress is animated by the 3D renderer using timestamps, with no scene rebuild timer.
+// Crops and workers advance while playing. Offline catch-up happens exactly once on load.
+const offlineActions=Object.values(initialWork).reduce((sum,c)=>sum+Object.values(c).reduce((a,b)=>a+b,0),0);
+if(offlineActions>0)showToast(`Welcome back! Your villagers completed ${offlineActions} jobs while you were away.`);
+window.setInterval(()=>{
+  const counts=advanceGame(game,Date.now());
+  saveGame(localStorage,game);
+  if(Object.values(counts).some(c=>Object.values(c).some(n=>n>0)))render();
+},2000);
 render();
 try{window.Telegram?.WebApp?.ready();window.Telegram?.WebApp?.expand()}catch{}

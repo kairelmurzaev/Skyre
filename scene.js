@@ -189,23 +189,33 @@ export function createScene(mount, callbacks){
   function rebuildVillagers(world){
     while(residents.children.length){const old=residents.children[0];residents.remove(old);old.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose()}})}
     walkers.length=0;
-    const cottages=world.buildings.filter(b=>b.type==='cottage');
-    if(!cottages.length)return;
-    const destinations=world.buildings.filter(b=>b.type==='plot'||b.type==='windmill'||b.type==='bakery'||b.type==='orchard');
-    const targets=destinations.length?destinations:cottages;
-    const count=Math.min(6,cottages.length*2);
-    for(let i=0;i<count;i++){
-      const home=cottages[i%cottages.length];const dest=targets[i%targets.length];
+    const workers=(world.workers||[]).slice(0,16);
+    for(let i=0;i<workers.length;i++){
+      const worker=workers[i];
+      const home=world.buildings.find(b=>b.id===worker.homeId&&b.type==='cottage');
+      if(!home)continue;
+      const available=types=>world.buildings.filter(b=>types.includes(b.type));
+      const targets=worker.job==='farmer'?available(['plot','orchard']):
+        worker.job==='miller'?available(['windmill']):
+        worker.job==='baker'?available(['bakery']):
+        worker.job==='forager'?[{x:-3.2,z:2.1},{x:3.1,z:2.1}]:[home];
+      const dest=targets.length?targets[i%targets.length]:home;
       const v=new THREE.Group();v.position.set(home.x,.22,home.z);residents.add(v);
-      const colors=['#c2b3dd','#e9b7a0','#a5c9ca','#ebcb98','#b2c99d','#c7bbdf'];
-      cyl(v,.11,.095,.31,[0,.31,0],colors[i],9);
+      const colors={farmer:'#a1bea0',miller:'#d6c49e',baker:'#e2a7a8',forager:'#95bccc',idle:'#c4b5d4'};
+      const hats={farmer:'#779d66',miller:'#b2a17a',baker:'#f4ece0',forager:'#7095a1',idle:'#a56d8e'};
+      cyl(v,.11,.095,.31,[0,.31,0],colors[worker.job]||colors.idle,9);
       ball(v,.105,[0,.58,0],i%2?'#9d785e':'#d9ae86');
-      cone(v,.16,.12,[0,.72,0],['#a56d7d','#73989d','#8a8274'][i%3],8);
+      const hat=cone(v,worker.job==='baker'?.19:.155,worker.job==='baker'?.19:.12,[0,.75,0],hats[worker.job]||hats.idle,8);
+      if(worker.job==='farmer'){
+        const brim=cyl(v,.18,.18,.025,[0,.69,0],'#d3c091');brim.castShadow=false;
+      }
+      if(worker.job==='forager')box(v,[.18,.24,.14],[.17,.31,-.10],'#8f694c');
+      if(worker.job==='miller')ball(v,.10,[.16,.28,0],'#e8d69d');
       for(const side of [-1,1])ball(v,.011,[side*.045,.59,.093],'#373d48');
       const leg1=cyl(v,.034,.04,.18,[-.065,.08,0],'#695c6b',6);
       const leg2=cyl(v,.034,.04,.18,[.065,.08,0],'#695c6b',6);
       v.traverse(o=>{if(o.isMesh)o.castShadow=false});
-      walkers.push({v,leg1,leg2,home,dest,phase:i*1.8+Math.PI*.2,speed:.25+(i%3)*.07});
+      walkers.push({v,leg1,leg2,home,dest,phase:i*1.8+Math.PI*.2,speed:.22+(i%3)*.07,job:worker.job});
     }
   }
   const raycaster=new THREE.Raycaster();const mouse=new THREE.Vector2();let start=null;
@@ -270,7 +280,7 @@ export function createScene(mount, callbacks){
       });
     }
     for(const o of orchards){
-      const ready=orchardReady(o.b,now);
+      const ready=orchardReady(o.b,now,received(currentGame,currentId).breeze);
       o.fruits.forEach((f,i)=>{f.visible=ready;f.scale.setScalar(ready?1+.08*Math.sin(t*2.5+i):1)});
     }
     for(const walker of walkers){
