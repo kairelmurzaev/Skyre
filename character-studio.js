@@ -21,7 +21,9 @@ const key=new THREE.DirectionalLight('#ffdfb7',3.1);key.position.set(-3,7,5);key
 const fill=new THREE.DirectionalLight('#bcdbee',1.0);fill.position.set(3,3,-4);scene.add(fill);
 const floor=new THREE.Mesh(new THREE.CylinderGeometry(1.27,1.36,.18,64),new THREE.MeshStandardMaterial({color:'#8daf91',roughness:1}));
 floor.position.y=-.16;floor.receiveShadow=true;scene.add(floor);
-const factory=createRiggedCharacterFactory();let rig=null;
+const masterSelected=new URLSearchParams(location.search).get('hero')==='1';
+const toggle=$('hero-link');toggle.textContent=masterSelected?'Switch back to current villagers':'Preview experimental master worker';toggle.href=masterSelected?'./character-studio.html':'?hero=1';
+const factory=createRiggedCharacterFactory({previewMaster:masterSelected});let rig=null;
 const looks=Array.from({length:LOOKS.length},(_,i)=>{
   for(let n=0;n<500;n++){
     const id='preview-villager-'+n;
@@ -38,7 +40,7 @@ async function refreshCharacter(){
   if(rig){scene.remove(rig.root);factory.release(rig);}
   const worker={id:looks[Number($('look').value)||0],job:$('job').value};
   rig=factory.create(worker);scene.add(rig.root);
-  $('status').textContent=`${villagerDesign(worker).outfit.name} · ${$('animation').value} animation · 17-bone rig`;
+  $('status').textContent=`${villagerDesign(worker).outfit.name} · ${$('animation').value} · ${rig.root.userData.characterStyle==='master-worker-preview'?'Master worker experiment':'Original rig'}`;
 }
 for(const id of ['look','job'])$(id).addEventListener('change',refreshCharacter);
 $('animation').addEventListener('change',()=>{$('status').textContent=$('animation').value+' animation';});

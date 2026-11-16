@@ -76,3 +76,14 @@ This is a tested multiplayer **MVP**, not a production launch certification. The
 - `server/http.js`: same-origin static files and `GET /api/world`, `POST /api/action`, `GET /api/health`.
 - `app.js`: local demo or signed live group with server polling and no client-side live saves.
 - `tests/`: deterministic rules and backend security/integration tests (`npm test`).
+
+
+## Experimental master worker character (v1.0 preview)
+
+Character Studio includes an opt-in **Preview experimental master worker** link at `character-studio.html?hero=1`. Add `?hero=1` to the game URL to preview the character on unassigned villagers; all other jobs use the stable v0.9 cast. Existing characters and gameplay stay unchanged by default.
+
+This is an **editable Blender character study**, not the approved final-quality model. It has an 18-joint humanoid armature, sculpted head and hair curls, layered clothing, separate fingers and detailed footwear; five animation states are driven by named bones. It still falls short of the cinematic character concept. Third-party multi-view modeling was blocked by insufficient Higgsfield credits; **no credits were spent**.
+
+The optional GLB is stored as six base64 text parts under `assets/characters/master-worker/` (~416 KiB gzip-compressed in total). The browser fetches it only when the preview is enabled, inflates it with `DecompressionStream`, validates its skeleton and falls back on failure. The individual cloth/hair meshes have not yet been production-optimized.
+
+[Open the editable master character scene](https://higgsfield.ai/3d-jutsu/be80feb4-cbc5-4e1c-9173-4cd1a76413bd).

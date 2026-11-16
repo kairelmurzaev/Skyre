@@ -3,15 +3,16 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import {villagerDesign} from './character-design.js';
 import {createCharacterFactory as createFallbackFactory} from './characters.js';
+import {loadMasterWorker,masterWorkerClips} from './master-worker.js';
 
 // A real skinned .glb with animation clips. The glTF is loaded only once and
 // SkeletonUtils.clone gives every villager independent joint transforms.
 // The v0.8 procedural renderer remains a fallback if the model cannot load.
-export function createRiggedCharacterFactory(){
+export function createRiggedCharacterFactory({previewMaster=false}={}){
   const fallback=createFallbackFactory();
   const instances=new Set();
-  let asset=null, disposed=false, loadError=null;
-  const ready=new Promise(resolve=>{
+  let asset=null, masterAsset=null, disposed=false, loadError=null;
+  const baseReady=new Promise(resolve=>{
     new GLTFLoader().load('./assets/characters/skyre-villager.glb', gltf=>{
       if(disposed)return resolve(false);
       const clips=new Set(gltf.animations.map(a=>a.name));
@@ -29,6 +30,20 @@ export function createRiggedCharacterFactory(){
       resolve(false);
     });
   });
+
+
+  const masterReady=previewMaster?loadMasterWorker().then(gltf=>{if(!disposed)masterAsset=gltf;return !!masterAsset;}).catch(error=>{console.warn('Skyre: experimental master worker unavailable, using existing model.',error);return false;}):Promise.resolve(false);
+  const ready=Promise.all([baseReady,masterReady]).then(([normal,master])=>normal||master);
+  function makeMasterRig(worker){
+    const root=new THREE.Group();root.userData.villagerId=worker.id;root.userData.characterStyle='master-worker-preview';
+    const model=cloneSkeleton(masterAsset.scene);model.scale.setScalar(.28);root.add(model);
+    let count=0;
+    model.traverse(o=>{if(o.isSkinnedMesh){o.frustumCulled=false;o.castShadow=count++<5;o.receiveShadow=true;}});
+    const mixer=new THREE.AnimationMixer(model);
+    const actions=new Map(masterWorkerClips().map(clip=>[clip.name,mixer.clipAction(clip)]));
+    const rig={root,model,mixer,actions,cargoMeshes:[],ownedMaterials:[],kind:'skinned',job:'idle',motion:null,lastTime:null,look:villagerDesign(worker).look};
+    instances.add(rig);return rig;
+  }
 
   function outfitColor(material,look,outfit){
     const colors={
@@ -73,6 +88,7 @@ export function createRiggedCharacterFactory(){
     return rig;
   }
   function create(worker){
+    if(masterAsset&&villagerDesign(worker).job==='idle')return makeMasterRig(worker);
     if(!asset){const rig=fallback.create(worker);rig.kind='fallback';return rig;}
     return makeRig(worker);
   }
@@ -104,7 +120,8 @@ export function createRiggedCharacterFactory(){
       asset.scene.traverse(obj=>{if(obj.isMesh){geometries.add(obj.geometry);const mats=Array.isArray(obj.material)?obj.material:[obj.material];for(const m of mats){materials.add(m);if(m.map)textures.add(m.map);}}});
       for(const m of materials)m.dispose();for(const g of geometries)g.dispose();for(const t of textures)t.dispose();
     }
+    if(masterAsset){const geometries=new Set(),materials=new Set();masterAsset.scene.traverse(o=>{if(o.isMesh){geometries.add(o.geometry);materials.add(o.material);}});for(const g of geometries)g.dispose();for(const m of materials)m?.dispose();}
     fallback.dispose();
   }
-  return {ready,create,animate,release,dispose,get assetLoaded(){return !!asset},get loadError(){return loadError}};
+  return {ready,create,animate,release,dispose,get assetLoaded(){return !!asset||!!masterAsset},get loadError(){return loadError}};
 }

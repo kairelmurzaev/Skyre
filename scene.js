@@ -49,7 +49,7 @@ export function createScene(mount, callbacks){
   const models=new THREE.Group();scene.add(models);
   const landscapeModels=new THREE.Group();scene.add(landscapeModels);
   const residents=new THREE.Group();scene.add(residents);
-  const characters=createRiggedCharacterFactory(),residentCache=new Map();
+  const characters=createRiggedCharacterFactory({previewMaster:new URLSearchParams(location.search).get('hero')==='1'}),residentCache=new Map();
   let sceneDisposed=false;
   characters.ready.then(loaded=>{
     if(sceneDisposed||!loaded||!currentGame)return;
