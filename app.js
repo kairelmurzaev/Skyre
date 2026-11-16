@@ -276,6 +276,35 @@ $('autocrop').onchange=()=>run({type:'autoCrop',crop:$('autocrop').value},()=>se
 $('toggle-lamp').onclick=toggleLamp;$('turn-mirror').onclick=turnMirror;$('send-seed').onclick=giftSeed;
 $('find-neighbor').onclick=()=>run({type:'connect'},()=>null,'Looking for another group.');
 $('camera-btn').onclick=()=>{zoomed=!zoomed;view?.setCamera(zoomed);$('camera-btn').textContent=zoomed?'⌕ Zoom out':'⌕ Zoom in'};
+$('character-camera-btn').onclick=()=>{
+  if(!view?.focusVillager())return showToast('Build a Cottage to welcome villagers.');
+  zoomed=false;$('camera-btn').textContent='⌕ Zoom in';
+  showToast('Meet your villagers! Drag to see their outfits and faces.');
+};
+// Fullscreen API on Android, CSS immersive fallback on browsers that disallow it
+// (including some iPhone versions). Either path keeps the 3D scene responsive.
+const viewport=$('scene'),fullscreenButton=$('fullscreen-btn');
+function toggleImmersive(active){
+  document.body.classList.toggle('immersive-game',active);
+  fullscreenButton.textContent=active?'↙ Exit full screen':'⛶ Full screen';
+  fullscreenButton.setAttribute('aria-label',active?'Exit expanded game view':'Expand game view');
+  if(active){
+    if(viewport.requestFullscreen && !document.fullscreenElement){
+      Promise.resolve(viewport.requestFullscreen()).catch(()=>{});
+    }
+  }else if(document.fullscreenElement){
+    Promise.resolve(document.exitFullscreen()).catch(()=>{});
+  }
+}
+fullscreenButton.onclick=()=>toggleImmersive(!document.body.classList.contains('immersive-game'));
+document.addEventListener('fullscreenchange',()=>{
+  if(!document.fullscreenElement&&document.body.classList.contains('immersive-game')){
+    document.body.classList.remove('immersive-game');
+    fullscreenButton.textContent='⛶ Full screen';
+    fullscreenButton.setAttribute('aria-label','Expand game view');
+  }
+});
+
 $('reset').onclick=()=>{if(isLive)return;if(!confirm('Reset both demo villages and remove all saved progress in this browser?'))return;localStorage.removeItem(SAVE_KEY);location.reload()};
 document.addEventListener('keydown',event=>{if(event.key.toLowerCase()==='r'&&!event.repeat){
   if(mode==='build'){rotation=(rotation+1)%4;render()}

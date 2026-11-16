@@ -1,8 +1,22 @@
-# Someone Else’s Sky — v0.7, A World Worth Growing
+# Someone Else’s Sky — v0.8, Living Faces
 
 A cozy 3D farming/building game where Telegram groups share **real persistent worlds** and can influence a paired group’s sunlight, moonlight and seeds. The farming, local inventories, village workers, roads, hauling and automation from v0.5 remain.
 
-## New in v0.7 — The island grows with you
+## New in v0.8 — Living Faces
+
+The character sheet approved for the game is a **visual concept**, not a rigged 3D asset. See the [character art direction](docs/CHARACTERS.md) and its reference image.
+This release translates that art direction into lightweight, in-engine Three.js figures:
+
+- Round storybook proportions, expressive faces, individual hair styles and skin tones, real arms, hands, legs, boots and clothing layers.
+- Job uniforms: farmer's straw hat and overalls; baker's chef hat and apron; forager's kerchief and apron; hauler's cap; miller's cap and work apron; casual villagers.
+- Separate articulated legs, arms and heads for walking, idle motion and carrying baskets along the existing logistics routes.
+- Stable, deterministic face/hair variations derived from existing worker IDs. Changing a villager's job changes only the uniform, not their identity. No new save fields or player data migration is necessary.
+- Geometry and material caches, reused resident models and reduced material setup protect mobile performance.
+- Both static Netlify mode and the optional Node backend serve the character modules. The game remains playable offline-from-backend (with its Three.js CDN loaded), without a Telegram bot.
+
+These are original **procedural interpretations** of the approved concept. The character-sheet image itself is not a drop-in, animated 3D model. More detailed sculpted GLB characters, authored texture maps, and animation clips can be swapped in later without changing the game rules.
+
+## Previously in v0.7 — The island grows with you
 
 - **Expand land:** Unlock The Green Shore and The Far Meadow with wood, stone and coins. The 3D shoreline and playable/buildable grid expand together, and the unlock is saved per world.
 - **Landscape:** Use the Landscape tool to place Flower Gardens (1 charm) and Lily Ponds (3 charm), or clear them. Ponds block construction and worker routes; decorative flowers are traversable but must be cleared to build on the tile. A new charm goal rewards decorating your island.

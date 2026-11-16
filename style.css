@@ -76,3 +76,25 @@
 .expand-button:disabled{opacity:.48;cursor:not-allowed;background:#40586a;color:#d7decc;border-color:#718a88}
 .island-subtitle{font-size:11px;color:#91b6b6;margin:12px 0 0}
 @media(max-width:540px){.island-stats strong{font-size:13px}.island-section .expand-button{font-size:11px}}
+
+/* v0.8 — An immersive game canvas, independent of surrounding dashboard UI. */
+.character-camera-btn{top:13px;right:13px;bottom:auto}
+.fullscreen-btn{right:119px}
+body.immersive-game{overflow:hidden}
+body.immersive-game .viewport,
+.viewport:fullscreen{
+  position:fixed;inset:0;width:100vw;height:100dvh;max-height:none;
+  z-index:110;border-radius:0;overflow:hidden;
+}
+body.immersive-game .viewport canvas,
+.viewport:fullscreen canvas{width:100%;height:100%}
+body.immersive-game .camera-btn,.viewport:fullscreen .camera-btn{
+  min-height:42px;padding:11px 14px;background:#122238de;
+  backdrop-filter:blur(8px);border:1px solid #f0debb91;
+}
+body.immersive-game .scene-overlay,.viewport:fullscreen .scene-overlay{z-index:1}
+@media(max-width:540px){
+  .character-camera-btn{top:10px;right:10px}
+  .fullscreen-btn{right:112px}
+  body.immersive-game .viewport,.viewport:fullscreen{height:100dvh}
+}
