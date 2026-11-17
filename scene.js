@@ -5,21 +5,25 @@ import {LAND_STAGES,LANDSCAPE,MAX_COORD,islandStage,withinWorld,walkableTile,bui
 import {buildingStock} from './logistics.js';
 import {planWorkerRoute} from './routing.js';
 import {createRiggedCharacterFactory} from './rigged-characters.js';
+import {createWorldArt} from './world-art.js';
 
-// Tiny procedural diorama: all models are built from geometry, no asset downloads.
+// Skyre World Remaster: authored stylized buildings, painterly textures and instanced foliage.
+// Gameplay rules are unchanged; art objects are local scene decorations.
 export function createScene(mount, callbacks){
-  const scene=new THREE.Scene();scene.background=new THREE.Color('#14263c');scene.fog=new THREE.FogExp2('#14263c',.019);
-  const camera=new THREE.PerspectiveCamera(43,1,.1,100);camera.position.set(12,11,18);
+  const scene=new THREE.Scene();scene.background=new THREE.Color('#c9d9d9');scene.fog=new THREE.FogExp2('#c9d9d9',.013);
+  const camera=new THREE.PerspectiveCamera(43,1,.1,100);camera.position.set(9.8,9.2,14.8);
   const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
-  renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=true;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.34;
+  renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   mount.append(renderer.domElement);
   const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
   controls.target.set(0,.15,0);controls.minDistance=3;controls.maxDistance=36;controls.maxPolarAngle=1.49;
   controls.enablePan=false;controls.minDistance=1.35;
-  const hemi=new THREE.HemisphereLight('#c6eaff','#394657',2.2);scene.add(hemi);
-  const sun=new THREE.DirectionalLight('#ffe4b6',2.3);sun.position.set(-6,12,8);sun.castShadow=true;
+  const hemi=new THREE.HemisphereLight('#fff1d6','#70887e',2.05);scene.add(hemi);
+  const sun=new THREE.DirectionalLight('#fff0c8',2.55);sun.position.set(-6,12,8);sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-11;sun.shadow.camera.right=11;sun.shadow.camera.top=11;sun.shadow.camera.bottom=-11;scene.add(sun);
   const material=(color,rough=.8,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
   const box=(parent,size,pos,color,rough=.8)=>mesh(parent,new THREE.BoxGeometry(...size),material(color,rough),pos);
@@ -29,13 +33,24 @@ export function createScene(mount, callbacks){
   const cyl=(p,r1,r2,h,pos,color,n=12)=>mesh(p,new THREE.CylinderGeometry(r1,r2,h,n),material(color),pos);
   const cone=(p,r,h,pos,color,n=8)=>mesh(p,new THREE.ConeGeometry(r,h,n),material(color),pos);
   const ball=(p,r,pos,color)=>mesh(p,new THREE.SphereGeometry(r,12,9),material(color),pos);
-  const table=box(scene,[23,.5,18],[0,-1.28,0],'#57444b');table.receiveShadow=true;
+  const art=createWorldArt();
+  const table=box(scene,[23,.5,18],[0,-1.28,0],'#57444b');
+  table.material=art.M.wood;table.receiveShadow=true;
+  // Gently beveled desk framing and visible inset joinery ground the diorama.
+  for(const z of [-8.82,8.82])art.box(scene,[22.95,.12,.18],[0,-1.02,z],art.M.darkWood);
+  for(const x of [-11.38,11.38])art.box(scene,[.18,.12,17.6],[x,-1.02,0],art.M.darkWood);
   const earthBase=cyl(scene,5.58,5.78,.48,[0,-.86,0],'#b9a077',64);
   const oceanBase=cyl(scene,5.36,5.49,.72,[0,-.34,0],'#4b8190',64);
   const meadowBase=cyl(scene,5.21,5.29,.22,[0,.06,0],'#86ac90',64);
+  // World-space ground, shoreline foam, sand, and painterly water overlay.
+  earthBase.material=art.M.stone;
+  oceanBase.material=art.M.water;
+  meadowBase.material=art.M.grass;
+  const coast=art.shoreline(scene,meadowBase,oceanBase);
+  const meadowDetail=art.meadowDetails(scene);
   const rim=mesh(scene,new THREE.TorusGeometry(5.55,.105,10,70),material('#bda57e',.3,.66),[0,-.67,0],[Math.PI/2,0,0]);rim.castShadow=false;
   // Glass is decoration only and does not intercept clicks.
-  const glass=mesh(scene,new THREE.SphereGeometry(6.25,44,30),new THREE.MeshPhysicalMaterial({color:'#ccefff',metalness:0,roughness:.06,transparent:true,opacity:.055,depthWrite:false,side:THREE.FrontSide,clearcoat:1}),[0,1.3,0]);
+  const glass=mesh(scene,new THREE.SphereGeometry(6.25,44,30),new THREE.MeshPhysicalMaterial({color:'#ccefff',metalness:0,roughness:.06,transparent:true,opacity:.035,depthWrite:false,side:THREE.FrontSide,clearcoat:1}),[0,1.3,0]);
   glass.raycast=()=>{};glass.castShadow=false;glass.receiveShadow=false;
   const glassLine=mesh(scene,new THREE.TorusGeometry(6.0,.018,7,64),new THREE.MeshBasicMaterial({color:'#bce7ff',transparent:true,opacity:.25,depthWrite:false}),[0,1.3,0],[.12,0,.25]);glassLine.raycast=()=>{};glassLine.castShadow=false;
   const grid=new THREE.Group();scene.add(grid);
@@ -93,12 +108,7 @@ export function createScene(mount, callbacks){
 
   const grove=new THREE.Group();scene.add(grove);
   function tree(p,x,z,s=1,pink=false){
-    const g=new THREE.Group();g.position.set(x,.16,z);g.scale.setScalar(s);p.add(g);
-    cyl(g,.09,.14,.62,[0,.30,0],'#806a50',8);
-    cone(g,.54,.94,[0,.86,0],pink?'#d4a4ba':'#5b9987',7);
-    cone(g,.42,.75,[0,1.26,0],pink?'#f1c3d4':'#79b69c',7);
-    cone(g,.28,.54,[0,1.61,0],pink?'#f5d2df':'#a0cba7',7);
-    return g;
+    return art.makeTree(p,x,z,s,pink);
   }
   [[-4.85,-1.25,.75],[-4.8,1.3,.8],[4.85,1.2,.75],[4.75,-1.3,.68],[.45,4.78,.76],[-2.4,-4.45,.66]].forEach(([x,z,s],i)=>{
     const g=tree(grove,x,z,s,i%3===0);
@@ -137,11 +147,9 @@ export function createScene(mount, callbacks){
   }
   function drawBuilding(b,game,id,now){
     const g=new THREE.Group();g.position.set(b.x,.18,b.z);g.rotation.y=(b.rotation||0)*Math.PI/2;models.add(g);
-    const tint=b.type==='plot'?'#8a6949':'#86aa86';
-    if(b.type!=='path')box(g,[.94,.07,.94],[0,.05,0],tint);
+    if(b.type!=='path')art.box(g,[.96,.060,.96],[0,.038,0],b.type==='plot'?art.M.wood:art.M.grass);
     if(b.type==='plot'){
-      box(g,[.86,.09,.82],[0,.10,0],'#6d5038');
-      for(let i=-1;i<=1;i++)box(g,[.10,.03,.7],[i*.23,.16,0],'#ad7d4f');
+      art.plot(g);
       if(b.crop){
         for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){
           const plant=new THREE.Group();plant.position.set(i*.21,.18,j*.24);g.add(plant);
@@ -166,47 +174,19 @@ export function createScene(mount, callbacks){
         }
       }
     } else if(b.type==='cottage'){
-      box(g,[.76,.73,.66],[0,.43,0],'#e9c8a4');
-      const roof=cone(g,.66,.72,[0,1.15,0],'#aa7180',4);roof.rotation.y=Math.PI/4;
-      box(g,[.2,.37,.04],[0,.27,.36],'#785d56');
-      box(g,[.18,.17,.03],[-.26,.63,.35],'#ffe7ad');
-      cyl(g,.05,.05,.28,[.25,1.38,-.1],'#9a7f74',6);
-      smoke(g,.25,1.52,-.1);
+      art.cottage(g,smoke,b.level||1);
     } else if(b.type==='windmill'){
-      cyl(g,.32,.46,1.24,[0,.68,0],'#e8d5b9',7);
-      cone(g,.48,.50,[0,1.56,0],'#b67d79',7);
-      const hub=new THREE.Group();hub.position.set(0,1.08,.38);g.add(hub);turbines.push(hub);
-      ball(hub,.1,[0,0,0],'#725b54');
-      for(let i=0;i<4;i++){const vane=box(hub,[.12,.70,.04],[0,.40,0],'#eadcc0');vane.rotation.z=i*Math.PI/2;vane.position.set(Math.sin(i*Math.PI/2)*.4,Math.cos(i*Math.PI/2)*.4,0)}
+      art.windmill(g,turbines);
     } else if(b.type==='bakery'){
-      box(g,[.82,.67,.78],[0,.42,0],'#d5bba4');
-      const roof=cone(g,.67,.53,[0,1.03,0],'#a36c6d',4);roof.rotation.y=Math.PI/4;
-      box(g,[.27,.33,.1],[0,.34,.42],'#d18e5e');
-      cyl(g,.12,.12,.65,[.27,1.27,-.2],'#a18c7a');
-      smoke(g,.27,1.62,-.2);
+      art.bakery(g,smoke);
     } else if(b.type==='well'){
-      cyl(g,.43,.43,.38,[0,.28,0],'#a4b8b6',16);
-      cyl(g,.33,.33,.35,[0,.48,0],'#407d96',16);
-      for(const x of [-.32,.32])cyl(g,.045,.05,.85,[x,.75,0],'#b39a76');
-      const roof=cone(g,.6,.38,[0,1.30,0],'#9b7d91',4);roof.rotation.y=Math.PI/4;
+      art.well(g);
     } else if(b.type==='path'){
-      for(let i=0;i<4;i++)box(g,[.36,.035,.38],[(i%2-.5)*.44,.03,(Math.floor(i/2)-.5)*.45],i%2?'#baa997':'#a4aaa2');
+      art.path(g,Math.round(b.x*97+b.z*31));
     } else if(b.type==='warehouse'){
-      box(g,[.86,.74,.83],[0,.44,0],'#9eb2a8');
-      const roof=cone(g,.66,.56,[0,1.12,0],'#8d7290',4);roof.rotation.y=Math.PI/4;
-      box(g,[.48,.56,.05],[0,.37,.44],'#8c735b');
-      for(let n=0;n<3;n++)box(g,[.19,.19,.20],[-.23+n*.21,.17,.49],'#c9a57b');
-      box(g,[.4,.12,.04],[0,.87,.435],'#eee1b7');
+      art.warehouse(g);
     } else if(b.type==='orchard'){
-      cyl(g,.095,.14,.72,[0,.43,0],'#8d7160',8);
-      for(const [ox,oy,oz,s] of [[0,1.06,0,.44],[-.24,.87,.09,.29],[.23,.92,-.11,.29]])ball(g,s,[ox,oy,oz],'#b8cfab');
-      const fruits=[];
-      for(let i=0;i<6;i++){
-        const a=i*Math.PI*2/6;
-        const f=ball(g,.07,[Math.cos(a)*.31,.87+Math.sin(i*2)*.12,Math.sin(a)*.28],'#f1c4aa');
-        fruits.push(f);
-      }
-      orchards.push({b,fruits});
+      const fruits=[];art.orchard(g,fruits);orchards.push({b,fruits});
     }
     if((b.level||1)>=2){
       // Golden detailing makes upgraded buildings instantly recognizable.
@@ -223,28 +203,13 @@ export function createScene(mount, callbacks){
     mark(g,{kind:'tile',x:b.x,z:b.z});
   }
   function renderLandscape(world){
-    while(landscapeModels.children.length){const object=landscapeModels.children[0];landscapeModels.remove(object);object.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose()}})}
+    while(landscapeModels.children.length){const object=landscapeModels.children[0];landscapeModels.remove(object);object.traverse(o=>{if(o.isMesh){if(!o.geometry.userData.sharedArt)o.geometry.dispose();if(!o.material.userData.sharedArt)o.material.dispose()}})}
     for(const [key,kind] of Object.entries(world.terrain||{})){
       const [x,z]=key.split(',').map(Number);
       if(!withinWorld(world,x,z))continue;
       const g=new THREE.Group();g.position.set(x,.19,z);landscapeModels.add(g);
-      if(kind==='pond'){
-        const water=mesh(g,new THREE.CylinderGeometry(.48,.48,.045,28),new THREE.MeshStandardMaterial({color:'#5ba6bc',metalness:.15,roughness:.22}),[0,.045,0]);
-        water.castShadow=false;
-        mesh(g,new THREE.TorusGeometry(.46,.06,8,28),material('#b8baa0'),[0,.045,0],[-Math.PI/2,0,0]);
-        for(let i=0;i<3;i++){
-          const a=i*Math.PI*2/3;
-          const pad=mesh(g,new THREE.CircleGeometry(.095,12),material('#75b48c'),[Math.cos(a)*.26,.076,Math.sin(a)*.26],[-Math.PI/2,0,0]);pad.castShadow=false;
-          if(i===0)ball(g,.058,[Math.cos(a)*.26,.12,Math.sin(a)*.26],'#e8aac9');
-        }
-      } else if(kind==='flowers'){
-        mesh(g,new THREE.CylinderGeometry(.47,.47,.045,24),material('#649979'),[0,.03,0]);
-        for(let i=0;i<7;i++){
-          const a=i*Math.PI*2/7,rx=Math.cos(a)*.3,rz=Math.sin(a)*.3;
-          cyl(g,.015,.018,.19,[rx,.145,rz],'#68975e',6);
-          ball(g,.07,[rx,.24,rz],i%2?'#f7c2d6':'#efda93');
-        }
-      }
+      if(kind==='pond')art.pond(g);
+      else if(kind==='flowers')art.garden(g);
       mark(g,{kind:'tile',x,z});
     }
   }
@@ -318,16 +283,17 @@ export function createScene(mount, callbacks){
   function refresh(game,id,options={}){
     currentGame=game;currentId=id;currentOptions={mode:'explore',buildType:'plot',rotation:0,selectedMove:null,...options};
     crops.length=0;turbines.length=0;chimneys.length=0;orchards.length=0;
-    while(models.children.length){const g=models.children[0];models.remove(g);g.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose()}})}
+    while(models.children.length){const g=models.children[0];models.remove(g);g.traverse(o=>{if(o.isMesh){if(!o.geometry.userData.sharedArt)o.geometry.dispose();if(!o.material.userData.sharedArt)o.material.dispose()}})}
     const world=game[id];const step=islandStage(world),scale=[1,1.18,1.42][step];
     for(const body of [earthBase,oceanBase,meadowBase])body.scale.set(scale,1,scale);
     rim.scale.setScalar(scale);
+    coast.scale(step);meadowDetail.scale.set(scale,1,scale);
     glass.scale.setScalar([1,1.16,1.35][step]);glassLine.scale.setScalar([1,1.16,1.35][step]);
     for(const b of world.buildings)drawBuilding(b,game,id,Date.now());
     renderLandscape(world);
     rebuildVillagers(game[id],game,id);
-    const incoming=received(game,id);hemi.intensity=incoming.sun?2.9:2.2;sun.intensity=incoming.sun?3:1.7;
-    sun.color.set(incoming.sun?'#ffe0a1':'#c1d4fb');
+    const incoming=received(game,id);hemi.intensity=incoming.sun?2.3:1.95;sun.intensity=incoming.sun?3.1:2.05;
+    sun.color.set(incoming.sun?'#ffe5ae':'#dbe4e7');
     lampLight.intensity=game[id].lamp?6:0;lampBulb.material.emissive.set(game[id].lamp?'#ffbd65':'#000000');
     mirrorFace.rotation.y=(game[id].mirror-1)*.40;
     tiles.forEach(tile=>{
@@ -347,7 +313,7 @@ export function createScene(mount, callbacks){
     });
     updatePreview();
   }
-  function setCamera(close){camera.position.set(...(close?[6,7.5,10]:[12,11,18]));controls.target.set(0,.15,0);controls.update()}
+  function setCamera(close){camera.position.set(...(close?[6,7.5,10]:[9.8,9.2,14.8]));controls.target.set(0,.15,0);controls.update()}
   function focusVillager(workerId){
     const selected=(workerId?walkers.find(w=>w.worker.id===workerId):null)||walkers[0];
     if(!selected)return false;
@@ -364,6 +330,7 @@ export function createScene(mount, callbacks){
     frameId=requestAnimationFrame(tick);
     const t=clock.getElapsedTime();
     const now=Date.now();
+    coast.animate(t);
     for(const p of crops){
       const stage=growth(currentGame,p.worldId,p.b,now);
       p.plant.scale.set(.35+stage*.65,Math.max(.12,stage),.35+stage*.65);

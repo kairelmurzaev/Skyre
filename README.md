@@ -1,3 +1,15 @@
+# Someone Else's Sky — v1.1, World Remaster
+
+**Major environment update.** Cottages now have actual gabled roofs, windows,
+timber framing, chimneys, front doors, porches and flowers. The bakery,
+storehouse, windmill and well are rebuilt. The island has painted
+grass/stone/soil/wood/tile materials, lush trees, decorated paths, and softer
+water and shoreline details. Open the
+[World Showcase](world-showcase.html) to inspect the new 3D models.
+
+Farm mechanics, villager characters, saves and optional server integration
+are unchanged. See [World Remaster Guide](docs/WORLD-REMASTER.md).
+
 # Someone Else's Sky — v0.9, Real Character Rigs
 
 **New visual milestone:** villagers now use a real glTF 2.0 skinned model with 17 bones, embedded painterly cloth/leather/hair textures, five baked animations (Idle, Walk, Carry, Work, Wave), eight stable appearances and job-dependent hats/aprons. The file is cloned with independent skeletons and played through `AnimationMixer`; jobs and roads still drive movement. In case it cannot load, the earlier geometry-based figure remains as a fallback.

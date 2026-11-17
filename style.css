@@ -98,3 +98,19 @@ body.immersive-game .scene-overlay,.viewport:fullscreen .scene-overlay{z-index:1
   .fullscreen-btn{right:112px}
   body.immersive-game .viewport,.viewport:fullscreen{height:100dvh}
 }
+
+
+/* v1.1 — a warmer botanical frame for the rebuilt painterly world. */
+body{background:radial-gradient(ellipse at 35% -20%,#305047 0,#1b3334 39%,#10252b 88%)}
+.scene-card,.workshop,.panel{background:#203a3a;border-color:#90ada255;box-shadow:0 14px 36px #061a2033}
+.topbar{border-bottom-color:#b4c7b029}
+.tag{border-color:#a0b99c88;color:#d6e3cf;background:#244a454b}
+.brandmark,.eyebrow,.brand small{color:#e7cc91}
+.scene-head{background:#213d3d}
+.heading p{color:#c8d7d0}
+.connection-banner{background:#27483f;border-color:#91b3a166;color:#f3e7c9}
+.art-lookbook{margin-left:auto;font-size:11px;text-decoration:none;color:#f1dfb7;white-space:nowrap;border:1px solid #a9c19c85;border-radius:40px;padding:9px 12px;background:#42604766;transition:background .2s}
+.art-lookbook:hover,.art-lookbook:focus-visible{background:#52745b}
+.art-lookbook+.tag{margin-left:0}
+button:hover:not(:disabled){filter:brightness(1.07)}
+@media(max-width:620px){.art-lookbook{font-size:9px;padding:8px 9px}.tag{font-size:8px;letter-spacing:.8px}}

@@ -1,0 +1,22 @@
+<!doctype html><html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Skyre World Remaster — Asset Showcase</title>
+<meta name="theme-color" content="#e5dfd1">
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#ece8df;color:#473d36;font-family:system-ui,-apple-system,sans-serif}
+main{max-width:1440px;margin:0 auto;padding:16px 20px 25px}header{display:flex;align-items:flex-end;justify-content:space-between;gap:22px;padding:8px 5px 18px}
+small{font-size:.7rem;letter-spacing:.20em;font-weight:800;color:#8f795e}h1{margin:4px 0 2px;font:600 clamp(1.65rem,3vw,3rem)/1.07 Georgia,serif;letter-spacing:-.05em}
+p{font-size:.9rem;margin:7px 0 0;color:#72675e}.mark{font-weight:800;letter-spacing:.15em;border:1px solid #cbb69b;padding:12px;border-radius:50px;color:#795d46;white-space:nowrap;font-size:.72rem}
+#showcase{border:1px solid #d1c5b2;border-radius:20px;overflow:hidden;position:relative;width:100%;height:min(72vh,800px);min-height:440px;background:#cedbd3;box-shadow:0 20px 45px #725b3920}
+#showcase canvas{display:block} .asset-names{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.asset-label{background:#faf5e8;border:1px solid #dacdb5;border-radius:999px;padding:9px 14px;font-size:.71rem;letter-spacing:.07em;font-weight:700}
+footer{margin-top:20px;display:flex;justify-content:space-between;gap:10px;font-size:.8rem;color:#827367}
+a{color:#694e35}@media(max-width:600px){header{align-items:flex-start}main{padding:10px}#showcase{height:60vh;min-height:450px}.mark{font-size:.60rem;padding:9px}footer{display:block}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script></head>
+<body><main>
+<header><div><small>SOMEONE ELSE'S SKY • VISUAL DEVELOPMENT</small><h1>World Remaster</h1><p>Six rebuilt village landmarks, painterly materials, new foliage and ground detail.</p></div><div class="mark">V1.1 · ART STUDY</div></header>
+<div id="showcase" aria-label="Interactive Three.js display of six Skyre building models"></div>
+<div class="asset-names"></div>
+<footer><span>Drag to orbit · Pinch or scroll to zoom · Original procedural meshes & textures</span><a href="./index.html">← Back to the game</a></footer>
+</main><script type="module" src="./world-showcase.js"></script></body></html>
