@@ -1,3 +1,20 @@
+# Skyre v1.2 — General Worker v2 integrated
+
+**The last approved General Worker v2 is now the default temporary model
+for all villagers in the actual game and Character Studio.** It uses a real
+23-bone KayKit-based skinned mesh, tailored vest, olive scarf, detailed face
+and hairstyle, and five embedded animation clips (Idle, Walk, Work, PickUp,
+UseItem). Workers can still follow paths, harvest, haul and work. We translate
+Carry -> Walk and Wave -> UseItem until replacement clips are available.
+
+The old v0.9 rigged models are still an automatic loading fallback. Browser
+saves, worker jobs, buildings and multiplayer protocols are unchanged.
+We are **not** claiming distinct finished Farmer/Baker sculpts: all roles
+temporarily share the v2 body with scarf-color accents, ready to replace later
+with user-created Blender models.
+
+Read [the integration and replacement guide](docs/WORKER-V2.md).
+
 # Someone Else's Sky — v1.1, World Remaster
 
 **Major environment update.** Cottages now have actual gabled roofs, windows,

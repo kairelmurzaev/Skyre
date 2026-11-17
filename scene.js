@@ -68,8 +68,8 @@ export function createScene(mount, callbacks){
   let sceneDisposed=false;
   characters.ready.then(loaded=>{
     if(sceneDisposed||!loaded||!currentGame)return;
-    // Replace the temporary procedural preview with one cloned skinned rig per
-    // resident. Workers' jobs, identity, position and routing stay unchanged.
+    // Use the latest approved v2 model for every resident (with an independent
+    // skeleton and animation mixer). Worker jobs, positions and saves are unchanged.
     for(const rig of residentCache.values())characters.release(rig);
     residentCache.clear();
     rebuildVillagers(currentGame[currentId],currentGame,currentId);
