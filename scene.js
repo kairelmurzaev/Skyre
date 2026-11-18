@@ -14,15 +14,15 @@ import {DESK_CAMERA_BOUNDS,clampOrbitToDesk} from './camera-bounds.js';
 export function createScene(mount, callbacks){
   const scene=new THREE.Scene();scene.background=new THREE.Color('#c9d9d9');scene.fog=new THREE.FogExp2('#c9d9d9',.013);
   const camera=new THREE.PerspectiveCamera(43,1,.1,100);camera.position.set(9.8,9.2,14.8);
-  // Battery-first defaults for touch-screen phones. Desktop fidelity is unchanged.
-  // A reversible graphics baseline while we collect real-device measurements.
+  // Preserve the visual sharpness of v1.6 on phones; power savings must not blur the world.
+  // A 60 FPS mobile cap avoids unnecessary 120 Hz rendering while retaining fluid motion.
   const mobileGraphics=window.matchMedia?.('(pointer: coarse)')?.matches&&window.innerWidth<=1024;
   const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:mobileGraphics?'default':'high-performance'});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,mobileGraphics?1:1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.34;
   renderer.shadowMap.enabled=true;
-  renderer.shadowMap.type=mobileGraphics?THREE.PCFShadowMap:THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   mount.append(renderer.domElement);
   const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
   controls.target.set(0,.15,0);
@@ -39,7 +39,7 @@ export function createScene(mount, callbacks){
   controls.enablePan=true;
   const hemi=new THREE.HemisphereLight('#fff1d6','#70887e',2.05);scene.add(hemi);
   const sun=new THREE.DirectionalLight('#fff0c8',2.55);sun.position.set(-6,12,8);sun.castShadow=true;
-  sun.shadow.mapSize.set(mobileGraphics?512:1024,mobileGraphics?512:1024);sun.shadow.camera.left=-11;sun.shadow.camera.right=11;sun.shadow.camera.top=11;sun.shadow.camera.bottom=-11;scene.add(sun);
+  sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-11;sun.shadow.camera.right=11;sun.shadow.camera.top=11;sun.shadow.camera.bottom=-11;scene.add(sun);
   const material=(color,rough=.8,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
   const box=(parent,size,pos,color,rough=.8)=>mesh(parent,new THREE.BoxGeometry(...size),material(color,rough),pos);
   function mesh(parent,geom,mat,pos=[0,0,0],rot=[0,0,0]){
@@ -394,9 +394,9 @@ export function createScene(mount, callbacks){
   function resize(){const w=mount.clientWidth,h=mount.clientHeight;if(w<1||h<1)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
   const ro=new ResizeObserver(resize);ro.observe(mount);resize();
   const clock=new THREE.Clock();
-  // Avoid drawing 60-120 identical-quality frames each second on phones.
+  // Reduce 120 Hz GPU work on phones without forcing visibly choppy 30 FPS.
   // Use the browser's animation timestamp rather than a fixed frame counter.
-  const minFrameMs=mobileGraphics?1000/30:0;
+  const minFrameMs=mobileGraphics?1000/60:0;
   let frameId=0,lastRenderAt=0;
   function tick(frameTime){
     frameId=0;

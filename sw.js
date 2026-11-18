@@ -1,6 +1,6 @@
 // Skyre v1.3 — offline-capable standalone web app.
 // Fetch user worlds through the existing app; never intercept /api or Telegram.
-const CACHE='skyre-mobile-v1.7.0-mobile-power';
+const CACHE='skyre-mobile-v1.7.1-visual-quality';
 const CORE=[
   './','./index.html','./style.css','./game-shell.css','./game-shell.js',
   './app.js','./manifest.webmanifest','./assets/ui/skyre-loading.avif','./assets/ui/skyre-loading.webp','./assets/ui/skyre-loading-portrait.avif',

@@ -4,12 +4,12 @@ import {readFile} from 'node:fs/promises';
 
 const scene=await readFile(new URL('../scene.js',import.meta.url),'utf8');
 
-test('phone scene uses battery-friendly raster and shadow settings',()=>{
+test('phone scene preserves detail while capping high-refresh rendering',()=>{
   assert.match(scene,/matchMedia\?\.\('\(pointer: coarse\)'\)/);
-  assert.match(scene,/mobileGraphics\?1:1\.5/);
-  assert.match(scene,/mobileGraphics\?512:1024/);
-  assert.match(scene,/mobileGraphics\?THREE\.PCFShadowMap:THREE\.PCFSoftShadowMap/);
-  assert.match(scene,/mobileGraphics\?1000\/30:0/);
+  assert.match(scene,/setPixelRatio\(Math\.min\(window\.devicePixelRatio\|\|1,1\.5\)\)/);
+  assert.match(scene,/sun\.shadow\.mapSize\.set\(1024,1024\)/);
+  assert.match(scene,/renderer\.shadowMap\.type=THREE\.PCFSoftShadowMap/);
+  assert.match(scene,/mobileGraphics\?1000\/60:0/);
 });
 
 test('render throttling does not stop simulation time or camera bounds',()=>{
