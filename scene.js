@@ -14,12 +14,15 @@ import {DESK_CAMERA_BOUNDS,clampOrbitToDesk} from './camera-bounds.js';
 export function createScene(mount, callbacks){
   const scene=new THREE.Scene();scene.background=new THREE.Color('#c9d9d9');scene.fog=new THREE.FogExp2('#c9d9d9',.013);
   const camera=new THREE.PerspectiveCamera(43,1,.1,100);camera.position.set(9.8,9.2,14.8);
-  const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+  // Battery-first defaults for touch-screen phones. Desktop fidelity is unchanged.
+  // A reversible graphics baseline while we collect real-device measurements.
+  const mobileGraphics=window.matchMedia?.('(pointer: coarse)')?.matches&&window.innerWidth<=1024;
+  const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:mobileGraphics?'default':'high-performance'});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,mobileGraphics?1:1.5));
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.34;
   renderer.shadowMap.enabled=true;
-  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type=mobileGraphics?THREE.PCFShadowMap:THREE.PCFSoftShadowMap;
   mount.append(renderer.domElement);
   const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
   controls.target.set(0,.15,0);
@@ -36,7 +39,7 @@ export function createScene(mount, callbacks){
   controls.enablePan=true;
   const hemi=new THREE.HemisphereLight('#fff1d6','#70887e',2.05);scene.add(hemi);
   const sun=new THREE.DirectionalLight('#fff0c8',2.55);sun.position.set(-6,12,8);sun.castShadow=true;
-  sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-11;sun.shadow.camera.right=11;sun.shadow.camera.top=11;sun.shadow.camera.bottom=-11;scene.add(sun);
+  sun.shadow.mapSize.set(mobileGraphics?512:1024,mobileGraphics?512:1024);sun.shadow.camera.left=-11;sun.shadow.camera.right=11;sun.shadow.camera.top=11;sun.shadow.camera.bottom=-11;scene.add(sun);
   const material=(color,rough=.8,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
   const box=(parent,size,pos,color,rough=.8)=>mesh(parent,new THREE.BoxGeometry(...size),material(color,rough),pos);
   function mesh(parent,geom,mat,pos=[0,0,0],rot=[0,0,0]){
@@ -391,8 +394,16 @@ export function createScene(mount, callbacks){
   function resize(){const w=mount.clientWidth,h=mount.clientHeight;if(w<1||h<1)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
   const ro=new ResizeObserver(resize);ro.observe(mount);resize();
   const clock=new THREE.Clock();
-  let frameId=0;function tick(){
+  // Avoid drawing 60-120 identical-quality frames each second on phones.
+  // Use the browser's animation timestamp rather than a fixed frame counter.
+  const minFrameMs=mobileGraphics?1000/30:0;
+  let frameId=0,lastRenderAt=0;
+  function tick(frameTime){
+    frameId=0;
+    if(sceneDisposed||document.hidden)return;
     frameId=requestAnimationFrame(tick);
+    if(minFrameMs&&lastRenderAt&&frameTime-lastRenderAt<minFrameMs-1)return;
+    lastRenderAt=frameTime;
     const t=clock.getElapsedTime();
     const now=Date.now();
     coast.animate(t);
@@ -466,14 +477,24 @@ export function createScene(mount, callbacks){
       characters.animate(walker.rig,t,walker.phase,{walking,carrying,working});
     }
     updateDeskCamera();renderer.render(scene,camera);
-  }tick();
+  }
+  function onVisibilityChange(){
+    if(document.hidden){
+      cancelAnimationFrame(frameId);frameId=0;
+    }else if(!sceneDisposed&&!frameId){
+      lastRenderAt=0;
+      frameId=requestAnimationFrame(tick);
+    }
+  }
+  document.addEventListener('visibilitychange',onVisibilityChange);
+  onVisibilityChange();
   return {refresh,setCamera,focusDesk,focusVillager,showDeskGhost,
     getCameraState:()=>({
       target:controls.target.toArray(),position:camera.position.toArray(),
       distance:controls.getDistance(),polar:controls.getPolarAngle(),
       azimuth:controls.getAzimuthalAngle()
     }),
-    highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){sceneDisposed=true;cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();
+    highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){sceneDisposed=true;cancelAnimationFrame(frameId);document.removeEventListener('visibilitychange',onVisibilityChange);ro.disconnect();controls.dispose();
     for(const rig of residentCache.values())characters.release(rig);
     residentCache.clear();characters.dispose();deskArt.dispose();renderer.dispose();renderer.domElement.remove()}};
 }
