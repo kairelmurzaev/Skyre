@@ -138,6 +138,6 @@ test('free placement UI exposes touch preview and contextual actions without hid
  assert.match(art,/kind:'desk-prop'/);
  assert.match(shell,/skyre:cancel-desk-edit/);
  assert.match(style,/skyre-desk-placing/);
- assert.match(sw,/skyre-mobile-v1\.(?:[567]\.0-(?:editor|camera|mobile-power)|7\.1-visual-quality)/);
+ assert.match(sw,/skyre-mobile-v1\.(?:[567]\.0-(?:editor|camera|mobile-power)|7\.[12]-(?:visual-quality|clear-village))/);
 });
 
