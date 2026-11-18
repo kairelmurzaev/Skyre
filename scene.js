@@ -6,6 +6,7 @@ import {buildingStock} from './logistics.js';
 import {planWorkerRoute} from './routing.js';
 import {createRiggedCharacterFactory} from './rigged-characters.js';
 import {createWorldArt} from './world-art.js';
+import {createDeskArt} from './desk-art.js';
 
 // Skyre World Remaster: authored stylized buildings, painterly textures and instanced foliage.
 // Gameplay rules are unchanged; art objects are local scene decorations.
@@ -21,7 +22,8 @@ export function createScene(mount, callbacks){
   mount.append(renderer.domElement);
   const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
   controls.target.set(0,.15,0);controls.minDistance=3;controls.maxDistance=36;controls.maxPolarAngle=1.49;
-  controls.enablePan=false;controls.minDistance=1.35;
+  // Two-finger touch pan lets players explore the whole physical desk.
+  controls.enablePan=true;controls.minDistance=1.35;
   const hemi=new THREE.HemisphereLight('#fff1d6','#70887e',2.05);scene.add(hemi);
   const sun=new THREE.DirectionalLight('#fff0c8',2.55);sun.position.set(-6,12,8);sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-11;sun.shadow.camera.right=11;sun.shadow.camera.top=11;sun.shadow.camera.bottom=-11;scene.add(sun);
@@ -136,6 +138,7 @@ export function createScene(mount, callbacks){
   cyl(mirrorFace,.56,.56,.10,[0,0,0],'#c8ad80',36).rotation.x=Math.PI/2;
   cyl(mirrorFace,.50,.50,.112,[0,0,.03],'#a6dce6',36).rotation.x=Math.PI/2;
   mirror.traverse(o=>{if(o.isMesh)o.userData.hit={kind:'mirror'}});
+  const deskArt=createDeskArt(scene);
   function mark(g,hit){g.traverse(o=>{if(o.isMesh)o.userData.hit=hit});}
   function smoke(g,x,y,z){
     const bubbles=[];
@@ -264,7 +267,7 @@ export function createScene(mount, callbacks){
 
   const raycaster=new THREE.Raycaster();const mouse=new THREE.Vector2();let start=null;
   function hit(e){const b=renderer.domElement.getBoundingClientRect();mouse.x=(e.clientX-b.left)/b.width*2-1;mouse.y=-(e.clientY-b.top)/b.height*2+1;raycaster.setFromCamera(mouse,camera);
-    for(const match of raycaster.intersectObjects([models,landscapeModels,grove,lamp,mirror,grid],true)){
+    for(const match of raycaster.intersectObjects([deskArt.group,models,landscapeModels,grove,lamp,mirror,grid],true)){
       if(match.object.userData.hit)return match.object.userData.hit;
     }
     return null;
@@ -291,6 +294,7 @@ export function createScene(mount, callbacks){
     glass.scale.setScalar([1,1.16,1.35][step]);glassLine.scale.setScalar([1,1.16,1.35][step]);
     for(const b of world.buildings)drawBuilding(b,game,id,Date.now());
     renderLandscape(world);
+    deskArt.refresh(world,currentOptions.mode==='desk-build');
     rebuildVillagers(game[id],game,id);
     const incoming=received(game,id);hemi.intensity=incoming.sun?2.3:1.95;sun.intensity=incoming.sun?3.1:2.05;
     sun.color.set(incoming.sun?'#ffe5ae':'#dbe4e7');
@@ -314,6 +318,12 @@ export function createScene(mount, callbacks){
     updatePreview();
   }
   function setCamera(close){camera.position.set(...(close?[6,7.5,10]:[9.8,9.2,14.8]));controls.target.set(0,.15,0);controls.update()}
+  function focusDesk(which='all'){
+    const target=which==='all'?{x:0,z:0}:deskArt.objects[which]||{x:6.0,z:-3.3};
+    controls.target.set(target.x,-.1,target.z);
+    camera.position.set(target.x+(which==='all'?12:5.0),which==='all'?13:7.3,target.z+(which==='all'?18:8.8));
+    controls.update();
+  }
   function focusVillager(workerId){
     const selected=(workerId?walkers.find(w=>w.worker.id===workerId):null)||walkers[0];
     if(!selected)return false;
@@ -331,6 +341,7 @@ export function createScene(mount, callbacks){
     const t=clock.getElapsedTime();
     const now=Date.now();
     coast.animate(t);
+    deskArt.animate(t);
     for(const p of crops){
       const stage=growth(currentGame,p.worldId,p.b,now);
       p.plant.scale.set(.35+stage*.65,Math.max(.12,stage),.35+stage*.65);
@@ -373,11 +384,35 @@ export function createScene(mount, callbacks){
         carrying=worker.job==='hauler'?(phase>.20&&phase<.8):returning;
         if(worker.job!=='hauler'&&phase>.46&&phase<.55){walking=false;working=true;carrying=false;}
       }
+      // A chosen resident briefly leaves the island and walks to the book stack.
+      // The actual reward is awarded exactly once by desk.js, not by animation.
+      const outing=currentGame?.[currentId]?.desk?.expedition;
+      if(outing?.workerId===worker.id){
+        const u=Math.max(0,Math.min(1,(now-outing.startedAt)/(outing.endsAt-outing.startedAt)));
+        const outbound=u<.43?u/.43:u<.58?1:(1-u)/.42;
+        const v=Math.max(0,Math.min(1,outbound));
+        const route=[
+          new THREE.Vector3(walker.home.x,.19,walker.home.z),
+          new THREE.Vector3(3.9,.19,-1.9),
+          new THREE.Vector3(4.5,.24,-2.1),
+          new THREE.Vector3(6.45,-.94,-3.75),
+          new THREE.Vector3(8.1,-.91,-4.65)
+        ];
+        const measure=(amount)=>{
+          const phase=amount*(route.length-1),i=Math.min(route.length-2,Math.floor(phase));
+          return route[i].clone().lerp(route[i+1],phase-i);
+        };
+        const pos=measure(v),next=measure(Math.min(1,v+.018));
+        walker.v.position.copy(pos);
+        const dx=next.x-pos.x,dz=next.z-pos.z;
+        if(Math.hypot(dx,dz)>.001)walker.v.rotation.y=Math.atan2(dx,dz)+(u>.58?Math.PI:0);
+        walking=u<.43||u>.58;working=!walking;carrying=false;
+      }
       characters.animate(walker.rig,t,walker.phase,{walking,carrying,working});
     }
     controls.update();renderer.render(scene,camera);
   }tick();
-  return {refresh,setCamera,focusVillager,highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){sceneDisposed=true;cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();
+  return {refresh,setCamera,focusDesk,focusVillager,highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){sceneDisposed=true;cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();
     for(const rig of residentCache.values())characters.release(rig);
-    residentCache.clear();characters.dispose();renderer.dispose();renderer.domElement.remove()}};
+    residentCache.clear();characters.dispose();deskArt.dispose();renderer.dispose();renderer.domElement.remove()}};
 }

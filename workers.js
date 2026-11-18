@@ -3,6 +3,7 @@ import {buildingStock,buildingFree,ensureStocks,processLocal,completeDelivery} f
 // Workers only change their own world; their actions never require another group online.
 import {CROP, plant, received} from './core.js';
 import {planWorkerRoute, workInterval} from './routing.js';
+import {advanceDesk} from './desk.js';
 
 export const JOBS = {
   idle:   {name:'Rest', icon:'☕', detail:'Wanders and enjoys the village', ms:30000},
@@ -136,6 +137,8 @@ export function advanceGame(game,now=Date.now()){
   const counts={a:STATS(),b:STATS()};
   for(const id of ['a','b']){
     const world=game[id];syncWorkers(world,now);
+    const deskComplete=advanceDesk(world,now);
+    if(deskComplete)counts[id].desk=deskComplete;
     if(now<=world.simulatedAt){world.simulatedAt=now;continue;}
     const from=Math.max(world.simulatedAt,now-MAX_OFFLINE_MS);
     // If a player was away longer than the cap, skip events older than the cap.

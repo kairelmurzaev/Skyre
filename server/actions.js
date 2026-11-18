@@ -2,6 +2,7 @@ import {expandIsland,setLandscape,LANDSCAPE,MAX_COORD} from '../terrain.js';
 import {BUILD,CROP,buildAt,moveAt,rotateAt,removeAt,plant,harvest,harvestOrchard,received,gather,processBuilding,sendSeed,claimGoal,record,upgradeAt} from '../core.js';
 import {assignWorker,setAutoCrop} from '../workers.js';
 import {collectBuilding,supplyBuilding} from '../logistics.js';
+import {buildOnDesk,removeFromDesk,collectDeskObject,startDeskExpedition} from '../desk.js';
 
 const integer=(v)=>Number.isSafeInteger(v)&&v>=-MAX_COORD&&v<=MAX_COORD;
 const string=(v,max=128)=>typeof v==='string'&&v.length>0&&v.length<=max;
@@ -10,6 +11,14 @@ export function executeAction(game,command,linked,now=Date.now()){
   if(!command||typeof command!=='object'||Array.isArray(command))return {error:'Invalid action.'};
   const a=command,w=game.a;let error=null,message='';
   switch(a.type){
+    case 'deskBuild':
+      error=buildOnDesk(w,a.site,a.building);message='Built a new miniature desk structure.';break;
+    case 'deskRemove':
+      error=removeFromDesk(w,a.site);message='Packed away a desk structure.';break;
+    case 'deskCollect':
+      error=collectDeskObject(w,a.object,now);message='Collected tiny treasures from the desk.';break;
+    case 'deskExplore':
+      error=startDeskExpedition(w,now);message='A villager set off to explore the giant books.';break;
     case 'expand':
       error=expandIsland(w);message='Expanded the island shoreline.';break;
     case 'landscape':

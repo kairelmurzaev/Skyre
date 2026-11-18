@@ -276,3 +276,22 @@ body.skyre-app .resource .caption{display:block}
  .skyre-primary,.skyre-secondary,.skyre-progress div{transition:none}
 }
 
+
+/* v1.4 — interactive desk sidebar: compact cards that remain usable on phones. */
+.desk-section .desk-overview{padding:12px;margin:8px 0 13px;border:1px solid #e6d4a570;border-radius:12px;background:#113b3bc7;color:#ffe1a1;font-size:13px;font-weight:700}
+.desk-actions{display:flex;gap:8px;margin:0 0 12px}
+.desk-actions button,.desk-card-actions button{border:1px solid #f3d9a17d;border-radius:10px;background:#345b57;color:#ffeac0;font-weight:700;font-size:12px;padding:9px 10px;min-height:40px;cursor:pointer}
+.desk-actions button{flex:1}
+.desk-card-actions button:disabled{opacity:.48;cursor:not-allowed}
+.desk-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:9px 0 14px}
+.desk-card,.desk-project,.desk-site{display:flex;flex-direction:column;gap:7px;padding:12px;border:1px solid #eedca15c;border-radius:13px;background:#122f36cd;color:#f8ead1;text-align:left}
+.desk-card strong,.desk-project strong,.desk-site strong{font-size:13px;line-height:1.25;color:#fff0c8}
+.desk-card small,.desk-project small,.desk-site small{display:block;font-size:11px;line-height:1.45;color:#c7d6cd}
+.desk-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+.desk-card-actions button{flex:1}
+.desk-project{width:100%;cursor:pointer;font-family:inherit}
+.desk-project.chosen{border-color:#ffe1a0;background:#455b49;box-shadow:inset 0 0 0 1px #ecd39d}
+.desk-sites{display:grid;gap:8px;margin-bottom:14px}
+.desk-site{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+.desk-site>div:first-child{flex:1;min-width:0}
+@media(max-width:410px){.desk-tiles{grid-template-columns:1fr}.desk-card-actions{flex-wrap:nowrap}}

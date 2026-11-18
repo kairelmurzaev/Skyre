@@ -1,3 +1,26 @@
+# Skyre v1.4 — Beyond the Island
+
+The desk is now part of the world. In the full-screen game, tap the coffee
+button or choose More > Desk adventures. The giant mug, book tower,
+and plant are clickable landmarks. Collect crumbs by the mug or seeds from
+the plant (with cooldowns), build miniature structures on four marked desk
+locations, and send a resident on a 32-second trip to explore the books.
+
+The first four desk areas support a Pencil Footbridge, Crumb Stall,
+Leaf Camp, Paper Workshop and Desk Lantern (some types share a
+location). Select an object in the Desk adventures panel and tap the marked
+spot in the 3D world, or build directly from that panel. A footbridge is
+required for book expeditions. Desk construction uses the existing wood and
+stone resources; discoveries grant coins and seeds exactly once per trip.
+
+Existing games are safe: the skyre-village-v1 save key stays unchanged;
+older saves receive a new, additive desk field. Desk actions are validated
+on the Telegram server as well as locally. The current release deliberately
+uses four designated desk sites (not freeform placement anywhere); this is
+the first playable stage of a more open desk sandbox.
+
+See [Beyond the Island documentation](docs/BEYOND-THE-ISLAND.md).
+
 # Skyre v1.3 — Mobile Game Experience
 
 Skyre launches with our **approved golden Skyre title artwork**, a loading

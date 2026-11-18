@@ -8,6 +8,7 @@ const progress=$('launch-progress'),loading=$('launch-loading');
 const hud=$('skyre-hud'),drawerShade=$('skyre-drawer-shade');
 const drawerHeader=$('skyre-drawer-title'),more=$('skyre-more');
 const buttonMap={
+  'desk':{panel:'.desk-section',title:'Beyond the Island'},
   'build':{panel:'.game-column > .workshop:not(.island-section):not(.inventory-section):not(.workers-section):not(.logistics-section)',mode:'build',title:'Build your village'},
   'farm':{panel:'.game-column > .workshop:not(.island-section):not(.inventory-section):not(.workers-section):not(.logistics-section)',mode:'farm',title:'Grow & harvest'},
   'landscape':{panel:'.game-column > .workshop:not(.island-section):not(.inventory-section):not(.workers-section):not(.logistics-section)',mode:'landscape',title:'Shape your island'},
@@ -52,6 +53,7 @@ function openDrawer(key){
   body.classList.add('skyre-drawer-open');
   document.querySelectorAll('[data-shell-open="'+key+'"]').forEach(b=>b.setAttribute('aria-expanded','true'));
   node.scrollTop=0;playClick();
+  if(key==='desk')window.dispatchEvent(new Event('skyre:focus-desk'));
 }
 function toggleMore(){
   if(!more.hidden){more.hidden=true;drawerShade.hidden=!activePanel;return;}
@@ -142,6 +144,8 @@ $('skyre-menu-button').addEventListener('click',showMenu);
 $('skyre-drawer-close').addEventListener('click',closeDrawer);
 drawerShade.addEventListener('click',()=>{closeDrawer();more.hidden=true;});
 $('skyre-more-button').addEventListener('click',toggleMore);
+$('skyre-desk-button').addEventListener('click',()=>openDrawer('desk'));
+window.addEventListener('skyre:open-desk',()=>{if(!document.querySelector('.desk-section.skyre-open-panel'))openDrawer('desk');});
 $('skyre-view-button').addEventListener('click',()=>document.getElementById('camera-btn')?.click());
 $('skyre-villager-button').addEventListener('click',()=>document.getElementById('character-camera-btn')?.click());
 $('skyre-fullscreen-button').addEventListener('click',requestGameFullscreen);

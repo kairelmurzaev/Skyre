@@ -1,5 +1,6 @@
 import {STOCK_LIMITS, buildingStock, storageFree, stockUsed, storageCapacity, ensureStocks} from './logistics.js';
 import {ensureTerrain,buildableTile,withinWorld,villageCharm} from './terrain.js';
+import {ensureDesk} from './desk.js';
 // Someone Else's Sky — deterministic game rules. No browser or rendering dependencies.
 export const SAVE_KEY = 'skyre-village-v1';
 export const CROP = {
@@ -28,7 +29,7 @@ const initialWorld=(id)=>({
     {id:id+'-field3',type:'plot',x:-2,z:1,rotation:0,crop:null}
   ],
   lamp:false,mirror:0,harvestedAt:{wood:0,stone:0},nextId:1,progress:{harvests:0,gifts:0,claimed:[]},
-  landLevel:0,terrain:{},workers:[],autoCrop:'wheat',workLog:[],workStats:{},simulatedAt:Date.now()
+  landLevel:0,terrain:{},desk:{builds:[],lastCollected:{},finds:0,expedition:null},workers:[],autoCrop:'wheat',workLog:[],workStats:{},simulatedAt:Date.now()
 });
 export const newGame=()=>({version:1,a:initialWorld('a'),b:initialWorld('b'),events:[]});
 export function loadGame(storage){
@@ -41,7 +42,7 @@ export function loadGame(storage){
         world.progress={harvests:0,gifts:0,claimed:[],...world.progress};
         if(!Array.isArray(world.progress.claimed))world.progress.claimed=[];
         if(!Number.isInteger(world.nextId))world.nextId=world.buildings.length+1;
-        ensureStocks(world);ensureTerrain(world);
+        ensureStocks(world);ensureTerrain(world);ensureDesk(world);
       }
       if(!Array.isArray(saved.events))saved.events=[];
       return saved;

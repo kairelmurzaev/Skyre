@@ -60,6 +60,7 @@
   </div>
   <div class="skyre-camera-stack">
     <button class="skyre-small-action" id="skyre-view-button" aria-label="Zoom in or out" title="Zoom">⌕</button>
+    <button class="skyre-small-action" id="skyre-desk-button" aria-label="Explore the desk" title="Desk adventures" type="button">☕</button>
     <button class="skyre-small-action" id="skyre-villager-button" aria-label="Focus on villagers" title="Villagers">☺</button>
   </div>
   <nav class="skyre-hud-bottom" aria-label="Sandbox tools">
@@ -79,6 +80,7 @@
 <div id="skyre-more" hidden>
   <h2>Island tools</h2>
   <div class="skyre-more-grid">
+    <button type="button" data-more-open="desk"><span>☕</span> Desk adventures</button>
     <button type="button" data-more-open="land"><span>⬡</span> Expand land</button>
     <button type="button" data-more-open="inventory"><span>▣</span> Inventory</button>
     <button type="button" data-more-open="production"><span>⚒</span> Crafting</button>
@@ -101,6 +103,19 @@
       <section class="scene-card"><div class="scene-head"><div><small>YOUR ISLAND</small><strong id="world-name">Amber Hollow</strong></div><div class="sky-badge" id="sky-badge">☾ Gentle twilight</div></div>
       <div class="viewport" id="scene"><div class="scene-overlay top-left">✧ <span id="scene-hint">Explore: tap a tree or rock to gather</span></div><div class="scene-overlay bottom-left">Drag to orbit · Scroll / pinch to zoom</div><button class="camera-btn character-camera-btn" id="character-camera-btn" type="button" aria-label="Look closely at your villagers">☺ Meet villagers</button><button class="camera-btn fullscreen-btn" id="fullscreen-btn" type="button" aria-label="Expand game view">⛶ Full screen</button><button class="camera-btn" id="camera-btn" type="button">⌕ Zoom in</button></div>
       <div class="resources" id="resources" aria-label="Inventory"></div><div class="village-stats" id="villager-count">2 villagers wandering · 4 buildings</div></section>
+      <section class="workshop desk-section" aria-label="Beyond the island">
+        <div class="workshop-top"><div><span class="eyebrow">THE WORLD BEYOND THE SHORE</span><h3>Adventures on your desk</h3></div><span class="crew-tag">DESK</span></div>
+        <p class="section-description">Your tiny villagers live beside giant everyday objects. Tap the mug or plant for supplies, build miniature structures on the wooden desk, and send an explorer to the books.</p>
+        <div class="desk-actions"><button type="button" id="desk-camera">◉ Look around desk</button><button type="button" id="desk-back">⌂ Return to island</button></div>
+        <div id="desk-overview" class="desk-overview" aria-live="polite"></div>
+        <div class="inventory-subtitle">GIANT DESK OBJECTS</div>
+        <div class="desk-tiles" id="desk-landmarks"></div>
+        <div class="inventory-subtitle">BUILD TINY STRUCTURES</div>
+        <p class="section-description" id="desk-status">Choose a project, then tap a glowing spot on the desk or use the site buttons below.</p>
+        <div class="desk-tiles" id="desk-build-catalog"></div>
+        <div class="inventory-subtitle">DESK BUILDING SPOTS</div>
+        <div id="desk-sites" class="desk-sites"></div>
+      </section>
       <section class="workshop island-section"><div class="workshop-top"><div><span class="eyebrow">A WORLD WORTH GROWING</span><h3>Make room for your dreams.</h3></div><span class="crew-tag">YOUR ISLAND</span></div>
       <div class="island-stats"><div><small>DISCOVERED SHORE</small><strong id="island-level">The First Isle</strong></div><div><small>VILLAGE CHARM</small><strong>✿ <span id="island-charm">0</span></strong></div></div>
       <p class="section-description" id="island-next">Expand the shore to discover new space for your village.</p>
