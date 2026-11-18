@@ -12,7 +12,7 @@ import {DESK_CAMERA_BOUNDS,clampOrbitToDesk} from './camera-bounds.js';
 // Skyre World Remaster: authored stylized buildings, painterly textures and instanced foliage.
 // Gameplay rules are unchanged; art objects are local scene decorations.
 export function createScene(mount, callbacks){
-  const scene=new THREE.Scene();scene.background=new THREE.Color('#c9d9d9');scene.fog=new THREE.FogExp2('#c9d9d9',.013);
+  const scene=new THREE.Scene();scene.background=new THREE.Color('#c9d9d9');
   const camera=new THREE.PerspectiveCamera(43,1,.1,100);camera.position.set(9.8,9.2,14.8);
   // Preserve the visual sharpness of v1.6 on phones; power savings must not blur the world.
   // A 60 FPS mobile cap avoids unnecessary 120 Hz rendering while retaining fluid motion.
