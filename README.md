@@ -1,3 +1,24 @@
+# Skyre v1.3 — Mobile Game Experience
+
+Skyre launches with our **approved golden Skyre title artwork**, a loading
+state and game home screen. Choose **Continue my world** to enter a real
+full-viewport game (no surrounding website sections). A mobile HUD provides
+resources, camera controls and Build / Farm / Decorate / People / More tools.
+The existing management panels remain available as scrollable game overlays.
+
+**Install on your phone:** in supported browsers, choose *Install App* or
+*Add to Home Screen*. Installed PWA mode is standalone. A normal browser tab
+may still display its address bar; the browser decides whether a Fullscreen
+API request is permitted. Telegram Mini Apps request expansion/fullscreen only
+on versions that support those methods.
+
+**Safety:** existing local saves (`skyre-village-v1`), world logic, residents,
+recipes and Telegram server protocols remain unchanged. **Creative Mode is not
+yet implemented**; its menu button is visibly marked coming later. Use the
+existing confirmed reset button for New World in local-demo mode.
+
+See [Mobile Game Experience guide](docs/MOBILE-GAME-EXPERIENCE.md).
+
 # Skyre v1.2 — General Worker v2 integrated
 
 **The last approved General Worker v2 is now the default temporary model

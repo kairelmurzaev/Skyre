@@ -323,5 +323,6 @@ $('group-picker').hidden=isLive;
 $('reset').hidden=isLive;
 $('network-status').textContent=isLive?'Connecting to Telegram group…':'LOCAL DEMO · Saves in this browser only';
 render();
+window.dispatchEvent(new CustomEvent('skyre:ready',{detail:{ok:!!view}}));
 if(isLive)fetchRemote();
 try{window.Telegram?.WebApp?.ready();window.Telegram?.WebApp?.expand()}catch{}

@@ -1,0 +1,278 @@
+
+/* Skyre v1.3 — phone-first app shell. Existing management components are kept
+   in the DOM and become individually scrollable bottom sheets. */
+html{height:100%;background:#0d2528}
+body.skyre-app{
+  margin:0; width:100%; height:100%; min-height:100%; overflow:hidden;
+  background:#081d24;overscroll-behavior:none;
+  color:#fff2d8;
+  -webkit-tap-highlight-color:transparent;
+}
+body.skyre-app .shell,
+body.skyre-app .layout,
+body.skyre-app .game-column,
+body.skyre-app .side-column,
+body.skyre-app .scene-card{
+  display:contents!important;
+}
+body.skyre-app .topbar,
+body.skyre-app .heading,
+body.skyre-app #network-status,
+body.skyre-app .scene-head,
+body.skyre-app .village-stats,
+body.skyre-app .scene-overlay.bottom-left,
+body.skyre-app #character-camera-btn,
+body.skyre-app #fullscreen-btn,
+body.skyre-app #camera-btn,
+body.skyre-app .footnote,
+body.skyre-app footer,
+body.skyre-app > p{
+  display:none!important;
+}
+body.skyre-app #scene.viewport,
+body.skyre-app.immersive-game #scene.viewport{
+  position:fixed!important;inset:0!important;
+  width:100vw!important;height:100dvh!important;
+  min-height:100dvh!important;max-height:none!important;
+  border:0!important;border-radius:0!important;z-index:1!important;
+  background:radial-gradient(circle at 50% 30%,#547c87,#183e4a 63%,#0b2932)!important;
+  overflow:hidden;touch-action:none;
+}
+body.skyre-app #scene.viewport canvas{width:100%!important;height:100%!important;display:block;touch-action:none}
+body.skyre-app .scene-overlay.top-left{
+  position:fixed;top:calc(env(safe-area-inset-top) + 112px);left:12px;
+  max-width:min(260px,60vw);padding:5px 9px;font-size:10px;
+  background:#102e347d;color:#ecf0d4;border:1px solid #fff4d624;
+  border-radius:999px;backdrop-filter:blur(7px);
+}
+body.skyre-app #resources.resources{
+  position:fixed!important;z-index:36!important;
+  top:calc(env(safe-area-inset-top) + 68px);left:50%;
+  transform:translateX(-50%);width:min(calc(100vw - 24px),680px);
+  display:flex!important;flex-wrap:nowrap!important;
+  gap:5px;padding:0;border:0;background:transparent;
+  overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+}
+body.skyre-app #resources.resources::-webkit-scrollbar{display:none}
+body.skyre-app #resources .resource{
+  flex:1 0 68px;padding:6px 8px 5px;min-width:0;
+  color:#fff6de;background:#122f35c9;
+  border:1px solid #eedcb74f;border-radius:11px;
+  backdrop-filter:blur(12px);box-shadow:0 6px 17px #0a1b2570;
+}
+body.skyre-app #resources .number{font-size:12px;color:#ffebae;white-space:nowrap}
+body.skyre-app #resources .caption{font-size:9px;line-height:1.1;margin-top:1px;color:#c3d5d1}
+#skyre-hud[hidden],#skyre-launch[hidden],#skyre-more[hidden],
+#skyre-drawer-shade[hidden],#skyre-drawer-close[hidden]{display:none!important}
+#skyre-hud{position:fixed;inset:0;z-index:34;pointer-events:none}
+#skyre-hud button{pointer-events:auto}
+.skyre-hud-top{
+  position:absolute;top:0;left:0;right:0;
+  padding:calc(env(safe-area-inset-top) + 10px) max(12px,env(safe-area-inset-left))
+    10px max(12px,env(safe-area-inset-right));
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  background:linear-gradient(180deg,#0b292dc4,transparent);
+  pointer-events:none;
+}
+.skyre-hud-title{text-align:center;flex:1;min-width:0;text-shadow:0 2px 10px #102d31}
+.skyre-hud-title b{
+  display:block;font:700 20px/.9 Georgia,serif;letter-spacing:.055em;
+  color:#ffe5a8;text-shadow:0 2px 2px #5a3f29,0 5px 12px #091b22;
+}
+.skyre-hud-title small{display:block;margin-top:3px;font-size:10px;color:#fff7db;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.skyre-icon{
+  display:grid;place-items:center;flex:none;min-width:45px;height:44px;padding:0 9px;
+  font-size:22px;line-height:1;border:1px solid #fff1ca80;
+  background:linear-gradient(145deg,#315452ed,#152d3adf)!important;color:#fff2cf;
+  border-radius:14px;box-shadow:0 5px 14px #081c27a8;
+  backdrop-filter:blur(12px);
+}
+.skyre-icon:active,.skyre-nav-item:active{transform:translateY(1px)}
+.skyre-hud-bottom{
+  position:absolute;bottom:0;left:0;right:0;
+  display:flex;gap:5px;justify-content:space-evenly;align-items:center;
+  padding:8px max(7px,env(safe-area-inset-right)) calc(9px + env(safe-area-inset-bottom)) max(7px,env(safe-area-inset-left));
+  pointer-events:auto;
+  background:linear-gradient(0deg,#102c31e8 10%,#1d3b3cbd 79%,#1d3b3c00 100%);
+}
+.skyre-nav-item{
+  min-width:0;flex:1 1 auto;display:flex;flex-direction:column;align-items:center;gap:4px;
+  border:1px solid #f8e6b865;border-radius:14px;
+  background:linear-gradient(155deg,#3f615bdc,#193b41e8);
+  color:#fcefd5;padding:9px 3px 7px;max-width:130px;
+  box-shadow:0 5px 13px #05232a90;
+  touch-action:manipulation;
+}
+.skyre-nav-item .symbol{font-size:21px;line-height:1}
+.skyre-nav-item .name{font-size:10px;font-weight:750;letter-spacing:.02em}
+.skyre-nav-item[aria-expanded="true"],.skyre-nav-item[aria-pressed="true"]{
+  background:linear-gradient(160deg,#e4c889,#b99759);color:#342d22;border-color:#fff1c0;
+}
+.skyre-camera-stack{position:absolute;right:12px;bottom:calc(98px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:7px;pointer-events:auto}
+.skyre-small-action{
+  border:1px solid #ffedbc82;background:#12393cbf;color:#ffefce;
+  border-radius:100%;width:43px;height:43px;display:grid;place-items:center;
+  font-size:20px;box-shadow:0 6px 16px #05171d78;backdrop-filter:blur(10px);
+}
+#skyre-drawer-shade{position:fixed;inset:0;z-index:49;background:#0012177d;
+  border:0;backdrop-filter:blur(2px);pointer-events:auto}
+body.skyre-app .workshop,
+body.skyre-app .side-column > .panel{display:none!important}
+body.skyre-app .workshop.skyre-open-panel,
+body.skyre-app .side-column > .panel.skyre-open-panel{
+  position:fixed!important;z-index:54!important;
+  display:block!important;
+  left:50%;transform:translateX(-50%);
+  bottom:calc(84px + env(safe-area-inset-bottom));
+  width:min(520px,calc(100vw - 20px));
+  max-height:min(67dvh,650px);
+  overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  padding:0 16px 19px;
+  border:1px solid #e6c98b9c;border-radius:22px;
+  background:linear-gradient(160deg,#294744f8,#182e39f8);
+  box-shadow:0 24px 55px #03181cce;
+  -webkit-overflow-scrolling:touch;scrollbar-width:thin;
+  backdrop-filter:blur(24px);
+}
+body.skyre-app .workshop.skyre-open-panel .workshop-top{
+  padding:0 0 9px;align-items:start;
+}
+body.skyre-app .workshop.skyre-open-panel h3,body.skyre-app .panel.skyre-open-panel h3{
+  margin:5px 0 12px;
+}
+.skyre-drawer-head{
+  position:sticky;z-index:3;top:0;left:auto;transform:none;bottom:auto;
+  width:calc(100% + 32px);height:49px;margin:0 -16px 15px;
+  padding:8px 12px 8px 18px;
+  background:linear-gradient(180deg,#254844,#1e3c41);
+  border-bottom:1px solid #e6c98b75;
+  color:#ffe0a3;display:flex;align-items:center;justify-content:space-between;
+  font-size:14px;font-weight:800;pointer-events:auto;
+}
+.skyre-drawer-head button{pointer-events:auto;border:1px solid #d8c29280;border-radius:11px;background:#355556;color:#ffe4b0;font-size:20px;width:36px;height:34px}
+body.skyre-app .catalog{grid-template-columns:repeat(2,minmax(0,1fr))}
+body.skyre-app .tabs{gap:5px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;padding:0 0 10px}
+body.skyre-app .tabs button{white-space:nowrap;flex:none;padding:10px 12px}
+body.skyre-app .resource .caption{display:block}
+#skyre-more{
+  position:fixed;z-index:57;right:12px;bottom:calc(93px + env(safe-area-inset-bottom));
+  width:min(340px,calc(100vw - 24px));max-height:66dvh;overflow:auto;
+  border:1px solid #e9cd97a6;border-radius:20px;padding:12px;
+  box-shadow:0 15px 48px #041a21c9;
+  background:linear-gradient(160deg,#294b47,#1a3240);
+  backdrop-filter:blur(20px);
+}
+#skyre-more h2{font:600 19px Georgia,serif;margin:4px 4px 12px}
+.skyre-more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.skyre-more-grid button{
+  border:1px solid #b7b68c73;background:#29484a;color:#fff0d2;border-radius:12px;
+  text-align:left;font-weight:600;font-size:12px;min-height:55px;padding:12px;
+}
+.skyre-more-grid button:disabled{opacity:.47}
+.skyre-more-grid button span{display:inline-block;margin-right:6px;font-size:18px}
+.skyre-more-foot{font-size:10px;color:#c2d4c8;margin:13px 4px 2px}
+.skyre-launch{
+  position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;color:#fff0ca;text-align:center;isolation:isolate;
+  background:#253f53;
+}
+.skyre-launch::before{
+  content:"";position:absolute;inset:-18px;z-index:-3;
+  background-image:image-set(url('./assets/ui/skyre-loading.avif') type('image/avif'),url('./assets/ui/skyre-loading.webp') type('image/webp'));
+  background-position:center 49%;background-size:cover;background-repeat:no-repeat;
+  transform:scale(1.035);
+  filter:saturate(1.12);
+}
+.skyre-launch::after{
+  content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(180deg,#0a263f13 0%,#1026350b 44%,#0a2227bd 76%,#07171fe8 100%);
+}
+.skyre-launch-logo{
+  position:absolute;top:clamp(10px,3vh,36px);left:50%;transform:translateX(-50%);
+  color:#ffe4a0;font:900 clamp(39px,7vw,76px)/1.07 Georgia,serif;
+  text-shadow:0 3px 2px #805225,0 7px 12px #0d2532,0 0 29px #eec26b;
+  letter-spacing:.018em;display:none;white-space:nowrap;
+}
+.skyre-launch-inner{
+  position:absolute;bottom:calc(7vh + env(safe-area-inset-bottom));
+  width:min(425px,calc(100% - 32px));padding:22px 18px;
+  background:linear-gradient(145deg,#102f3cc7,#173d37c4);
+  border:1px solid #fff0b786;border-radius:22px;
+  backdrop-filter:blur(17px);box-shadow:0 12px 60px #061b2380;
+}
+.skyre-launch-kicker{font-size:10px;font-weight:800;letter-spacing:.28em;color:#fae1a3}
+.skyre-launch-inner h2{font:600 clamp(22px,3vw,31px) Georgia,serif;margin:9px 0 7px}
+.skyre-launch-inner p{font-size:12px;line-height:1.55;color:#e8e3d7;margin:3px 0 17px}
+.skyre-launch-actions{display:flex;flex-direction:column;gap:9px}
+.skyre-primary,.skyre-secondary{
+  min-height:47px;border-radius:13px;font-size:14px;font-weight:780;
+  padding:12px 16px;transition:filter .18s,transform .18s;
+}
+.skyre-primary{border:1px solid #ffedba;background:linear-gradient(180deg,#ffe0a0,#bb8c4f);color:#302b26;box-shadow:0 5px 19px #0004}
+.skyre-primary:disabled{opacity:.5;cursor:wait}
+.skyre-secondary{border:1px solid #ffdfb284;background:#20494bc9;color:#f5e7c9}
+.skyre-secondary:disabled{opacity:.52;cursor:not-allowed}
+.skyre-launch-actions .skyre-others{display:flex;gap:8px}
+.skyre-launch-actions .skyre-others button{flex:1;min-width:0}
+.skyre-launch .muted{display:block;margin-top:12px;font-size:10px;line-height:1.4;color:#d6d9cd}
+.skyre-launch-load{padding:8px 0}
+.skyre-progress{margin:10px 0;width:100%;height:7px;border-radius:999px;overflow:hidden;background:#f7edcf3a;border:1px solid #fbefcb54}
+.skyre-progress div{height:100%;width:18%;border-radius:999px;background:linear-gradient(90deg,#e1b764,#ffe4aa);transition:width .4s}
+.skyre-launch[data-state="loading"] #launch-menu{display:none}
+.skyre-launch[data-state="menu"] #launch-loading-pane,.skyre-launch[data-state="settings"] #launch-loading-pane{display:none}
+#launch-settings{color:#f6e8d2;text-align:left}
+#launch-settings h2{text-align:center}
+#launch-settings .settings-row{display:flex;flex-direction:column;gap:8px;margin:9px 0}
+#launch-settings .settings-row button{width:100%}
+#skyre-install-help{font-size:12px;color:#e5d4b2;line-height:1.5}
+.skyre-launch[data-state="settings"] #launch-menu{display:none}
+@media(max-width:800px) and (orientation:portrait){
+  .skyre-launch::before{
+    background-image:url('./assets/ui/skyre-loading-portrait.avif');
+    background-position:center center;
+    background-size:cover;
+    filter:saturate(1.08);
+    transform:scale(1.015);
+  }
+  /* The approved golden lettering is part of the portrait artwork. */
+  .skyre-launch-logo{display:none}
+  .skyre-launch-inner{bottom:calc(5vh + env(safe-area-inset-bottom));width:calc(100vw - 34px);padding:18px 15px}
+  .skyre-launch-kicker{font-size:9px}
+}
+@media(max-width:600px){
+  body.skyre-app #resources.resources{top:calc(env(safe-area-inset-top) + 64px)}
+  body.skyre-app #resources .resource{flex:1 0 67px}
+  body.skyre-app .scene-overlay.top-left{display:none}
+  .skyre-icon{width:42px;min-width:42px;height:42px;font-size:21px}
+  .skyre-hud-title b{font-size:19px}
+  .skyre-hud-bottom{gap:4px;padding-left:5px;padding-right:5px}
+  .skyre-nav-item{padding:8px 2px 7px;border-radius:13px}
+  .skyre-nav-item .symbol{font-size:20px}
+  .skyre-nav-item .name{font-size:9px}
+  .skyre-camera-stack{right:10px;bottom:calc(96px + env(safe-area-inset-bottom))}
+  body.skyre-app .workshop.skyre-open-panel,
+  body.skyre-app .side-column > .panel.skyre-open-panel{
+    width:calc(100vw - 12px);border-radius:19px;
+    bottom:calc(81px + env(safe-area-inset-bottom));
+    max-height:67dvh;padding:0 12px 14px;
+  }
+  .skyre-drawer-head{width:calc(100% + 24px);margin:0 -12px 14px}
+  body.skyre-app .catalog{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .skyre-launch-inner h2{font-size:25px}
+}
+@media(max-height:620px) and (orientation:landscape){
+ .skyre-hud-bottom{padding-top:4px;padding-bottom:calc(5px + env(safe-area-inset-bottom))}
+ .skyre-nav-item{flex-direction:row;justify-content:center;min-height:42px;max-width:170px;padding:6px 8px}
+ .skyre-nav-item .symbol{font-size:19px}
+ .skyre-camera-stack{bottom:calc(68px + env(safe-area-inset-bottom));right:8px}
+ body.skyre-app .workshop.skyre-open-panel,body.skyre-app .side-column > .panel.skyre-open-panel{bottom:calc(61px + env(safe-area-inset-bottom));max-height:70dvh}
+
+ .skyre-launch-inner{width:min(460px,45vw);right:3%;left:auto;bottom:12%;padding:15px}
+ .skyre-launch-inner h2{font-size:24px}
+}
+@media(prefers-reduced-motion:reduce){
+ .skyre-primary,.skyre-secondary,.skyre-progress div{transition:none}
+}
+

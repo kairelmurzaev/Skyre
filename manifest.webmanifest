@@ -1,0 +1,30 @@
+{
+  "id": "./index.html",
+  "name": "Skyre — Someone Else's Sky",
+  "short_name": "Skyre",
+  "description": "A tiny living island sandbox for your phone.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "background_color": "#132f33",
+  "theme_color": "#132f33",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./assets/ui/skyre-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/ui/skyre-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
