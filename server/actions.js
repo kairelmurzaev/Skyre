@@ -2,7 +2,7 @@ import {expandIsland,setLandscape,LANDSCAPE,MAX_COORD} from '../terrain.js';
 import {BUILD,CROP,buildAt,moveAt,rotateAt,removeAt,plant,harvest,harvestOrchard,received,gather,processBuilding,sendSeed,claimGoal,record,upgradeAt} from '../core.js';
 import {assignWorker,setAutoCrop} from '../workers.js';
 import {collectBuilding,supplyBuilding} from '../logistics.js';
-import {buildOnDesk,removeFromDesk,collectDeskObject,startDeskExpedition} from '../desk.js';
+import {buildOnDesk,removeFromDesk,collectDeskObject,startDeskExpedition,buildFreeDesk,moveFreeDesk,rotateFreeDesk,storeFreeDesk,relocateDeskSite} from '../desk.js';
 
 const integer=(v)=>Number.isSafeInteger(v)&&v>=-MAX_COORD&&v<=MAX_COORD;
 const string=(v,max=128)=>typeof v==='string'&&v.length>0&&v.length<=max;
@@ -11,6 +11,21 @@ export function executeAction(game,command,linked,now=Date.now()){
   if(!command||typeof command!=='object'||Array.isArray(command))return {error:'Invalid action.'};
   const a=command,w=game.a;let error=null,message='';
   switch(a.type){
+    case 'deskPropBuild':
+      error=buildFreeDesk(w,a.building,a.x,a.z,a.rotation);
+      message='Built a movable desk structure.';break;
+    case 'deskPropMove':
+      error=moveFreeDesk(w,a.id,a.x,a.z,a.rotation);
+      message='Repositioned a desk structure.';break;
+    case 'deskPropRotate':
+      error=rotateFreeDesk(w,a.id);
+      message='Rotated a desk structure.';break;
+    case 'deskPropStore':
+      error=storeFreeDesk(w,a.id);
+      message='Stored a desk structure.';break;
+    case 'deskSiteRelocate':
+      error=relocateDeskSite(w,a.site,a.x,a.z,a.rotation);
+      message='Relocated a desk structure from its original site.';break;
     case 'deskBuild':
       error=buildOnDesk(w,a.site,a.building);message='Built a new miniature desk structure.';break;
     case 'deskRemove':

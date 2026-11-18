@@ -38,7 +38,8 @@ function closeDrawer(){
 function modeClick(mode){
   document.querySelector('.tabs [data-mode="'+mode+'"]')?.click();
 }
-function openDrawer(key){
+function openDrawer(key,focusOnOpen=true){
+  if(body.classList.contains('skyre-desk-placing'))window.dispatchEvent(new Event('skyre:cancel-desk-edit'));
   const cfg=buttonMap[key];
   if(!cfg)return;
   const node=document.querySelector(cfg.panel);
@@ -53,9 +54,10 @@ function openDrawer(key){
   body.classList.add('skyre-drawer-open');
   document.querySelectorAll('[data-shell-open="'+key+'"]').forEach(b=>b.setAttribute('aria-expanded','true'));
   node.scrollTop=0;playClick();
-  if(key==='desk')window.dispatchEvent(new Event('skyre:focus-desk'));
+  if(key==='desk'&&focusOnOpen)window.dispatchEvent(new Event('skyre:focus-desk'));
 }
 function toggleMore(){
+  if(body.classList.contains('skyre-desk-placing'))window.dispatchEvent(new Event('skyre:cancel-desk-edit'));
   if(!more.hidden){more.hidden=true;drawerShade.hidden=!activePanel;return;}
   closeDrawer();more.hidden=false;drawerShade.hidden=false;playClick();
 }
@@ -145,7 +147,8 @@ $('skyre-drawer-close').addEventListener('click',closeDrawer);
 drawerShade.addEventListener('click',()=>{closeDrawer();more.hidden=true;});
 $('skyre-more-button').addEventListener('click',toggleMore);
 $('skyre-desk-button').addEventListener('click',()=>openDrawer('desk'));
-window.addEventListener('skyre:open-desk',()=>{if(!document.querySelector('.desk-section.skyre-open-panel'))openDrawer('desk');});
+window.addEventListener('skyre:open-desk',()=>{if(!document.querySelector('.desk-section.skyre-open-panel'))openDrawer('desk',false);});
+window.addEventListener('skyre:close-panel',closeDrawer);
 $('skyre-view-button').addEventListener('click',()=>document.getElementById('camera-btn')?.click());
 $('skyre-villager-button').addEventListener('click',()=>document.getElementById('character-camera-btn')?.click());
 $('skyre-fullscreen-button').addEventListener('click',requestGameFullscreen);

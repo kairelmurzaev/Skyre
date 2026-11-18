@@ -295,3 +295,42 @@ body.skyre-app .resource .caption{display:block}
 .desk-site{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
 .desk-site>div:first-child{flex:1;min-width:0}
 @media(max-width:410px){.desk-tiles{grid-template-columns:1fr}.desk-card-actions{flex-wrap:nowrap}}
+
+/* Skyre v1.5: low-friction, CoC-inspired confirm/cancel desk placement. */
+#skyre-desk-edit[hidden]{display:none!important}
+.skyre-desk-edit{
+  position:absolute;pointer-events:auto;
+  left:50%;transform:translateX(-50%);
+  bottom:calc(92px + env(safe-area-inset-bottom));
+  width:min(440px,calc(100vw - 26px));
+  padding:11px;
+  border:1px solid #f2d8a3b5;border-radius:15px;
+  background:linear-gradient(155deg,#284e49f2,#173641ed);
+  box-shadow:0 8px 32px #051a24a6;backdrop-filter:blur(15px);
+  text-align:center;color:#ffebc2;
+}
+.skyre-desk-edit-head{display:flex;flex-direction:column;gap:5px}
+.skyre-desk-edit-head strong{font-size:14px;line-height:1.3}
+.skyre-desk-edit-head small{font-size:11px;line-height:1.4;color:#d2e4d7}
+.skyre-desk-edit-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:10px}
+.skyre-desk-edit-actions button{min-height:43px;border-radius:11px;padding:8px 5px;border:1px solid #eadca77a;background:#2c5354;color:#fff1c9;font-weight:750;font-size:12px}
+.skyre-desk-edit-actions button:last-child{background:linear-gradient(160deg,#fce0a1,#b99b59);color:#312b22;border-color:#fff0c1}
+.skyre-desk-edit-actions button:disabled{opacity:.42}
+.desk-inspector{padding:11px;border-radius:14px;border:1px solid #ebd497a0;background:linear-gradient(140deg,#37574ae8,#1b4744c9);display:flex;flex-direction:column;gap:8px;margin:7px 0 13px}
+.desk-inspector[hidden]{display:none!important}
+.desk-inspector strong{color:#fff0c7}
+.desk-inspector small{font-size:11px;color:#d0ded1;line-height:1.5}
+.desk-inspector-actions{display:flex;flex-wrap:wrap;gap:7px}
+.desk-inspector-actions button{flex:1;min-width:67px;padding:10px 7px;min-height:40px;background:#254f50;color:#fff1d2;border:1px solid #f1d9a080;border-radius:10px;font-weight:700;font-size:12px}
+.desk-site.selected{border-color:#fff0b0;background:#2d5144}
+@media (max-height:620px) and (orientation:landscape){
+ .skyre-desk-edit{width:min(530px,calc(100vw - 130px));bottom:calc(63px + env(safe-area-inset-bottom));padding:7px}
+ .skyre-desk-edit-head{flex-direction:row;align-items:center;justify-content:center;gap:12px}
+ .skyre-desk-edit-actions{margin-top:5px}
+ .skyre-desk-edit-actions button{min-height:31px;padding:4px}
+}
+
+/* Surface only the resources relevant to the current desk-building action. */
+body.skyre-desk-placing #resources.resources{width:auto!important;max-width:calc(100vw - 26px);min-width:140px}
+body.skyre-desk-placing #resources .resource:nth-child(n+3){display:none!important}
+body.skyre-desk-placing #resources .resource{min-width:74px}

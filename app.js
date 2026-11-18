@@ -4,7 +4,8 @@ import {newGame,SAVE_KEY,CROP,BUILD,other,loadGame,saveGame,findAt,buildAt,remov
 import {createScene} from './scene.js';
 import {JOBS,syncWorkers,assignWorker,setAutoCrop,advanceGame,MAX_OFFLINE_MS} from './workers.js';
 import {planWorkerRoute,roadSummary,workInterval} from './routing.js';
-import {DESK_SITES,DESK_BUILDS,DESK_OBJECTS,ensureDesk,deskAt,buildOnDesk,removeFromDesk,collectDeskObject,startDeskExpedition} from './desk.js';
+import {DESK_SITES,DESK_BUILDS,DESK_OBJECTS,ensureDesk,deskAt,buildOnDesk,removeFromDesk,collectDeskObject,startDeskExpedition,
+  FREE_DESK_TYPES,deskProp,deskPlacementError,buildFreeDesk,moveFreeDesk,rotateFreeDesk,storeFreeDesk,relocateDeskSite,snapDesk} from './desk.js';
 
 const $=id=>document.getElementById(id);
 const initData=window.Telegram?.WebApp?.initData||'';
@@ -53,7 +54,7 @@ async function run(command,localAction,message,after){
   }
 }
 
-let group='a',mode='explore',chosenBuild='plot',chosenCrop='wheat',chosenLandscape='flowers',rotation=0,zoomed=false,toastTimer,selectedMove=null,selectedRoute=null,chosenDeskBuild='bridge',selectedDeskObject='books';
+let group='a',mode='explore',chosenBuild='plot',chosenCrop='wheat',chosenLandscape='flowers',rotation=0,zoomed=false,toastTimer,selectedMove=null,selectedRoute=null,chosenDeskBuild='bridge',selectedDeskObject='books',selectedDeskPropId=null,selectedDeskSiteId=null,deskEdit=null,deskCandidate=null,deskRotation=0;
 const entries=[['wood','🪵','Wood'],['stone','◈','Stone'],['seeds','✧','Seeds'],['wheat','🌾','Wheat'],['flour','◌','Flour'],['food','🍞','Food'],['coins','✦','Coins']];
 const showToast=text=>{const el=$('toast');el.textContent=text;el.classList.add('shown');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('shown'),3200)};
 const costLabel=cost=>Object.entries(cost).map(([k,v])=>`${v} ${k}`).join(' · ');
@@ -70,16 +71,98 @@ const tileInfo=(x,z)=>{
   return `${BUILD[b.type]?.name||b.type}. Choose Remove to reclaim half its building materials.`;
 };
 let view;
+function onDeskHover(point){
+  if(!deskEdit)return;
+  deskCandidate={x:snapDesk(point.x),z:snapDesk(point.z)};
+  const w=game[group];
+  const error=deskPlacementError(w,deskEdit.type,deskCandidate.x,deskCandidate.z,deskRotation,
+    deskEdit.kind==='prop'?deskEdit.id:null,deskEdit.kind==='site'?deskEdit.site:null);
+  const cost=DESK_BUILDS[deskEdit.type].cost;
+  const lack=deskEdit.kind==='new'&&!canAfford(w,cost);
+  const valid=!error&&!lack;
+  $('skyre-desk-edit-status').textContent=error|| (lack?'Not enough wood or stone.':
+    '✓ Valid position · '+deskCandidate.x+', '+deskCandidate.z+' · '+(deskRotation*90)+'°');
+  $('skyre-desk-confirm').disabled=!valid;
+  view?.showDeskGhost({type:deskEdit.type,...deskCandidate,rotation:deskRotation,valid});
+}
+function beginDeskEdit(source){
+  if(isLive&&!liveReady)return showToast('Connect to your village first.');
+  deskEdit=source;deskRotation=source.rotation||0;deskCandidate=null;
+  selectedDeskPropId=source.kind==='prop'?source.id:null;
+  mode=source.kind==='new'?'desk-place':'desk-move';
+  $('skyre-desk-edit-title').textContent=
+    (source.kind==='new'?'Place ':'Move ')+DESK_BUILDS[source.type].name;
+  $('skyre-desk-edit-status').textContent='Tap or drag on the desk (two fingers to pan). '+(source.kind==='new'?costLabel(DESK_BUILDS[source.type].cost)+' · ':'')+'Green = valid; red = blocked.';
+  $('skyre-desk-edit').hidden=false;
+  document.body.classList.add('skyre-desk-placing');
+  $('skyre-desk-confirm').disabled=true;
+  $('skyre-desk-confirm').textContent=source.kind==='new'?'✓ Build':'✓ Move';
+  window.dispatchEvent(new Event('skyre:close-panel'));
+  view?.focusDesk('all');
+  render();
+}
+function finishDeskEdit(reopen=false){
+  deskEdit=null;deskCandidate=null;deskRotation=0;
+  mode='explore';
+  $('skyre-desk-edit').hidden=true;
+  document.body.classList.remove('skyre-desk-placing');
+  view?.showDeskGhost(null);
+  render();
+  if(reopen)window.dispatchEvent(new Event('skyre:open-desk'));
+}
+function confirmDeskEdit(){
+  if(!deskEdit||!deskCandidate||$('skyre-desk-confirm').disabled)return;
+  const action={...deskEdit},point={...deskCandidate},rotation=deskRotation;
+  const w=game[group];
+  if(action.kind==='new'){
+    run({type:'deskPropBuild',building:action.type,...point,rotation},
+      ()=>buildFreeDesk(w,action.type,point.x,point.z,rotation),
+      'Built '+DESK_BUILDS[action.type].name+' on your desk.',()=>{
+        selectedDeskPropId=ensureDesk(game[group]).props.at(-1)?.id||null;finishDeskEdit(true);
+      });
+  }else if(action.kind==='prop'){
+    run({type:'deskPropMove',id:action.id,...point,rotation},
+      ()=>moveFreeDesk(w,action.id,point.x,point.z,rotation),
+      'Moved your desk structure.',()=>{
+        selectedDeskPropId=action.id;finishDeskEdit(true);
+      });
+  }else if(action.kind==='site'){
+    run({type:'deskSiteRelocate',site:action.site,...point,rotation},
+      ()=>relocateDeskSite(w,action.site,point.x,point.z,rotation),
+      'Relocated a desk structure.',()=>{
+        selectedDeskPropId=ensureDesk(game[group]).props.at(-1)?.id||null;selectedDeskSiteId=null;finishDeskEdit(true);
+      });
+  }
+}
+$('skyre-desk-rotate').addEventListener('click',()=>{
+  if(!deskEdit)return;
+  deskRotation=(deskRotation+1)%4;
+  if(deskCandidate)onDeskHover(deskCandidate);
+  else $('skyre-desk-edit-status').textContent='Rotation '+(deskRotation*90)+'° · Tap the desk to select a spot.';
+});
+$('skyre-desk-cancel').addEventListener('click',()=>finishDeskEdit(true));
+window.addEventListener('skyre:cancel-desk-edit',()=>{if(deskEdit)finishDeskEdit(false);});
+$('skyre-desk-confirm').addEventListener('click',confirmDeskEdit);
 function onHit(hit){
   if(hit.kind==='lamp')return toggleLamp();
   if(hit.kind==='mirror')return turnMirror();
   if(hit.kind==='gather')return gatherResource(hit.type);
+  if(hit.kind==='desk-ground'){
+    if(deskEdit)onDeskHover(hit);
+    return;
+  }
+  if(hit.kind==='desk-prop'){
+    selectedDeskPropId=hit.id;selectedDeskSiteId=null;
+    render();window.dispatchEvent(new Event('skyre:open-desk'));
+    return;
+  }
   if(hit.kind==='desk-object'){
     selectedDeskObject=hit.id;renderDesk();
     window.dispatchEvent(new Event('skyre:open-desk'));
     return;
   }
   if(hit.kind==='desk-site'){
+    selectedDeskSiteId=hit.id;selectedDeskPropId=null;
     if(mode==='desk-build')
       return run({type:'deskBuild',site:hit.id,building:chosenDeskBuild},()=>buildOnDesk(game[group],hit.id,chosenDeskBuild),'Built a miniature structure on the desk.');
     renderDesk();window.dispatchEvent(new Event('skyre:open-desk'));
@@ -105,7 +188,7 @@ function onHit(hit){
   if(found?.type==='orchard')return run({type:'orchard',x,z},()=>harvestOrchard(w,x,z,Date.now(),received(game,group).breeze),'Collected magical fruit.');
   showToast(tileInfo(x,z));
 }
-try{view=createScene($('scene'),{onHit,getMode:()=>mode})}catch(err){
+try{view=createScene($('scene'),{onHit,onDeskHover,getMode:()=>mode})}catch(err){
   $('scene').insertAdjacentHTML('afterbegin','<p style="padding:30px;color:#ffdfb7">Your browser could not start 3D graphics. Try a browser with WebGL enabled.</p>');
   console.error('Skyre WebGL:',err);
 }
@@ -114,7 +197,13 @@ function toggleLamp(){run({type:'lamp'},()=>{game[group].lamp=!game[group].lamp;
 function turnMirror(){run({type:'mirror'},()=>{game[group].mirror=(game[group].mirror+1)%3;return null},'Turned the moon mirror.');}
 function giftSeed(){run({type:'seed'},()=>linked?sendSeed(game,group):'Connect with another group before gifting seeds.','Sent seeds to another sky.');}
 function gatherResource(kind){run({type:'gather',kind},()=>gather(game[group],kind),`Gathered ${kind}.`);}
-function setMode(next){mode=next;selectedMove=null;render()}
+function setMode(next){
+  if(deskEdit){
+    deskEdit=null;deskCandidate=null;$('skyre-desk-edit').hidden=true;
+    document.body.classList.remove('skyre-desk-placing');view?.showDeskGhost(null);
+  }
+  mode=next;selectedMove=null;render();
+}
 function renderCatalog(){const el=$('catalog');el.replaceChildren();let items=[];
   if(mode==='build')items=Object.entries(BUILD).map(([id,v])=>({id,icon:v.icon,title:v.name,sub:costLabel(v.cost),active:id===chosenBuild}));
   if(mode==='landscape')items=[...Object.entries(LANDSCAPE).map(([id,v])=>({id,icon:v.icon,title:v.name,sub:costLabel(v.cost)+' · +'+v.charm+' charm',active:id===chosenLandscape})),{id:'clear',icon:'✕',title:'Clear landscape',sub:'Remove an existing garden or pond',active:chosenLandscape==='clear'}];
@@ -133,14 +222,16 @@ function renderCatalog(){const el=$('catalog');el.replaceChildren();let items=[]
     });el.append(btn);
   }
   $('rotate-hint').textContent=mode==='build'?`Rotation ${rotation*90}° · R to rotate`:mode==='move'?'Rearrange your village freely':mode==='farm'?'Crops grow while offline':mode==='landscape'?'Gardens brighten your island':mode==='upgrade'?'Tap an eligible building':'Drag to orbit';
-  const copy={explore:'Tap <b>trees or rocks</b> in the 3D world to collect materials. Tap buildings to inspect them.',farm:'Choose a crop, then <b>tap an empty garden plot</b>. Return to harvest when it has grown. Sunlight from the other group speeds growth.',build:'Choose a building, then <b>tap a green highlighted tile</b> to place it. Red means occupied or too expensive. Rotate the preview with <b>R</b>.',move:'Tap an existing building, then <b>tap an empty tile</b> to move it for free. Select a building and use <b>R</b> to rotate it.',demolish:'Tap a building to <b>remove it</b>. You recover half the original wood and stone.',landscape:'Choose a flower garden, lily pond, or Clear. <b>Tap an empty unlocked tile</b>. Ponds block building and walking until removed.',upgrade:'Tap a Cottage, Storehouse or Windmill to upgrade it. Upgrades add villagers, storage or milling output.', 'desk-build':'Use Desk Adventures to choose a mini structure, then tap a glowing desk building spot.'};
+  const copy={explore:'Tap <b>trees or rocks</b> in the 3D world to collect materials. Tap buildings to inspect them.',farm:'Choose a crop, then <b>tap an empty garden plot</b>. Return to harvest when it has grown. Sunlight from the other group speeds growth.',build:'Choose a building, then <b>tap a green highlighted tile</b> to place it. Red means occupied or too expensive. Rotate the preview with <b>R</b>.',move:'Tap an existing building, then <b>tap an empty tile</b> to move it for free. Select a building and use <b>R</b> to rotate it.',demolish:'Tap a building to <b>remove it</b>. You recover half the original wood and stone.',landscape:'Choose a flower garden, lily pond, or Clear. <b>Tap an empty unlocked tile</b>. Ponds block building and walking until removed.',upgrade:'Tap a Cottage, Storehouse or Windmill to upgrade it. Upgrades add villagers, storage or milling output.', 'desk-build':'Use Desk Adventures to choose a mini structure, then tap a glowing desk building spot.',
+    'desk-place':'Tap or drag on the desk to position your structure, then confirm or cancel.',
+    'desk-move':'Reposition the selected structure, then confirm or cancel.'};
   $('tool-help').innerHTML=copy[mode]+(mode==='build'||mode==='move'?' <button type="button" id="rotate-button" class="reset">↻ Rotate</button>':'');
   $('rotate-button')?.addEventListener('click',()=>{
     if(mode==='build'){rotation=(rotation+1)%4;render();return}
     if(!selectedMove)return showToast('Select a building to rotate first.');
     run({type:'rotate',x:selectedMove.x,z:selectedMove.z},()=>rotateAt(game[group],selectedMove.x,selectedMove.z),'Rotated the selected building.');
   });
-  $('scene-hint').textContent={explore:'Explore: tap a tree or rock to gather',farm:'Farm: tap a plot to plant or harvest',build:'Build: tap a green tile to place',move:selectedMove?'Move: choose an empty destination':'Move: tap any building',demolish:'Remove: tap a building to recycle',landscape:'Landscape: tap a free tile',upgrade:'Upgrade: tap a cottage, storehouse or windmill','desk-build':'Desk: tap a glowing desk building spot'}[mode];
+  $('scene-hint').textContent={explore:'Explore: tap a tree or rock to gather',farm:'Farm: tap a plot to plant or harvest',build:'Build: tap a green tile to place',move:selectedMove?'Move: choose an empty destination':'Move: tap any building',demolish:'Remove: tap a building to recycle',landscape:'Landscape: tap a free tile',upgrade:'Upgrade: tap a cottage, storehouse or windmill','desk-build':'Desk: tap a glowing desk building spot','desk-place':'Desk: choose a free position','desk-move':'Desk: choose a new position'}[mode];
 }
 function renderProduction(){const el=$('production');el.replaceChildren();const w=game[group];const recipes=[{type:'windmill',title:'🌾 Grind cloud wheat',desc:'3 wheat → 2 flour',needs:{wheat:3}},{type:'bakery',title:'🥖 Bake fresh bread',desc:'2 flour → 6 food + 4 coins',needs:{flour:2}}];
   for(const r of recipes){const btn=document.createElement('button');btn.className='recipe';const built=w.buildings.some(b=>b.type===r.type);const affordable=canAfford(w,r.needs);btn.disabled=!built||!affordable;
@@ -249,7 +340,7 @@ function renderDesk(){
   const w=game[group],d=ensureDesk(w),now=Date.now(),landmarks=$('desk-landmarks');
   $('desk-overview').textContent=d.expedition
     ? '📚 A villager is exploring the books · '+Math.max(0,Math.ceil((d.expedition.endsAt-now)/1000))+'s until they return'
-    : '✦ '+d.finds+' book discoveries · '+d.builds.length+' desk structures built';
+    : '✦ '+d.finds+' discoveries · '+(d.builds.length+d.props.length)+' desk structures built';
   landmarks.replaceChildren();
   for(const [id,object] of Object.entries(DESK_OBJECTS)){
     const card=document.createElement('div');card.className='desk-card';
@@ -273,15 +364,20 @@ function renderDesk(){
     }
     actions.append(act);card.append(title,info,actions);landmarks.append(card);
   }
-  $('desk-status').textContent='Selected: '+DESK_BUILDS[chosenDeskBuild].name+'. Choose a compatible open spot below or tap the glowing desk marker.';
+  $('desk-status').textContent=chosenDeskBuild==='bridge'?'The Pencil Footbridge must connect at Book Crossing.':'Choose a structure and place it freely on the wood. Existing marked spots still work.';
   const catalog=$('desk-build-catalog');catalog.replaceChildren();
   for(const [id,build] of Object.entries(DESK_BUILDS)){
     const button=document.createElement('button');button.className='desk-project'+(id===chosenDeskBuild?' chosen':'');
     button.type='button';button.setAttribute('aria-pressed',String(id===chosenDeskBuild));
     const label=document.createElement('strong');label.textContent=build.icon+' '+build.name;
-    const hint=document.createElement('small');hint.textContent=build.description+' · '+costLabel(build.cost);
+    const hint=document.createElement('small');hint.textContent=build.description+' · '+costLabel(build.cost)+(id==='bridge'?' · Fixed crossing':' · Place freely');
     button.append(label,hint);
-    button.onclick=()=>{chosenDeskBuild=id;mode='desk-build';render();view?.focusDesk('all');};
+    button.onclick=()=>{
+      chosenDeskBuild=id;
+      if(FREE_DESK_TYPES.includes(id)){beginDeskEdit({kind:'new',type:id});return;}
+      mode='desk-build';render();view?.focusDesk('all');
+      showToast('Tap Book Crossing to build the Pencil Footbridge.');
+    };
     catalog.append(button);
   }
   const sites=$('desk-sites');sites.replaceChildren();
@@ -295,6 +391,11 @@ function renderDesk(){
     const actions=document.createElement('div');actions.className='desk-card-actions';
     const btn=document.createElement('button');btn.type='button';
     if(existing){
+      if(existing.type!=='bridge'){
+        const move=document.createElement('button');move.type='button';move.textContent='Move';
+        move.onclick=()=>beginDeskEdit({kind:'site',site:site.id,type:existing.type,rotation:0});
+        actions.append(move);
+      }
       btn.textContent='Store';btn.onclick=()=>{
         if(!confirm('Store the '+DESK_BUILDS[existing.type].name+'? You will recover half its materials.'))return;
         run({type:'deskRemove',site:site.id},()=>removeFromDesk(w,site.id),'Stored a desk building.');
@@ -306,6 +407,40 @@ function renderDesk(){
       btn.onclick=()=>{chosenDeskBuild=desired;mode='desk-build';run({type:'deskBuild',site:site.id,building:desired},()=>buildOnDesk(w,site.id,desired),'Built '+DESK_BUILDS[desired].name+' on the desk.');};
     }
     actions.append(btn);row.append(info,actions);sites.append(row);
+  }
+  // Contextual actions, similar to object selection in village building games.
+  const selected=selectedDeskPropId?deskProp(w,selectedDeskPropId):null;
+  const inspector=$('desk-selected');inspector.replaceChildren();inspector.hidden=!selected;
+  if(selected){
+    const name=document.createElement('strong');name.textContent=DESK_BUILDS[selected.type].icon+' '+DESK_BUILDS[selected.type].name;
+    const position=document.createElement('small');
+    position.textContent='Placed at '+selected.x+', '+selected.z+' · '+(selected.rotation*90)+'° · Tap objects directly on the desk to select.';
+    const actions=document.createElement('div');actions.className='desk-inspector-actions';
+    function add(label,fn){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;actions.append(b);}
+    add('↔ Move',()=>beginDeskEdit({kind:'prop',id:selected.id,type:selected.type,rotation:selected.rotation}));
+    add('↻ Rotate',()=>run({type:'deskPropRotate',id:selected.id},()=>rotateFreeDesk(w,selected.id),'Rotated desk structure.'));
+    add('▣ Store',()=>{
+      if(!confirm('Store this '+DESK_BUILDS[selected.type].name+' and recover half its materials?'))return;
+      run({type:'deskPropStore',id:selected.id},()=>storeFreeDesk(w,selected.id),'Stored desk structure.',()=>{selectedDeskPropId=null;});
+    });
+    inspector.append(name,position,actions);
+  }
+  const propsList=$('desk-props');propsList.replaceChildren();
+  if(!d.props.length){
+    const empty=document.createElement('p');empty.className='section-description';
+    empty.textContent='Nothing placed freely yet. Choose a project above to build wherever it fits.';
+    propsList.append(empty);
+  }
+  for(const prop of d.props){
+    const row=document.createElement('div');row.className='desk-site'+(selectedDeskPropId===prop.id?' selected':'');
+    const info=document.createElement('div'),name=document.createElement('strong'),where=document.createElement('small');
+    name.textContent=DESK_BUILDS[prop.type].icon+' '+DESK_BUILDS[prop.type].name;
+    where.textContent='Position '+prop.x+', '+prop.z+' · '+prop.rotation*90+'°';
+    info.append(name,where);
+    const actions=document.createElement('div');actions.className='desk-card-actions';
+    const select=document.createElement('button');select.type='button';select.textContent='Select';
+    select.onclick=()=>{selectedDeskPropId=prop.id;render();};
+    actions.append(select);row.append(info,actions);propsList.append(row);
   }
 }
 function renderIsland(){
@@ -343,7 +478,12 @@ function render(){const w=game[group],n=game[other(group)],effects=received(game
   $('turn-mirror').querySelector('small').textContent=w.mirror===2?'Moonbeam is aligned':'Angle '+(w.mirror+1)+'/3 · redirect moonlight';
   $('events').replaceChildren();const recent=game.events.length?game.events.slice(0,5):[{message:'Nothing has stirred the universe yet. Be the first.'}];
   for(const e of recent){const div=document.createElement('div');div.className='event';div.textContent=e.message;if(e.at){const time=document.createElement('time');time.textContent=new Date(e.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});div.append(time)}$('events').append(div)}
-  renderCatalog();renderProduction();renderInventory();renderWorkers();renderLogistics();renderGoals();renderIsland();renderDesk();view?.refresh(game,group,{mode,buildType:chosenBuild,landscapeKind:chosenLandscape,rotation,selectedMove});view?.highlightRoute(selectedRoute);
+  renderCatalog();renderProduction();renderInventory();renderWorkers();renderLogistics();renderGoals();renderIsland();renderDesk();
+  const deskGhost=deskEdit&&deskCandidate?{type:deskEdit.type,...deskCandidate,rotation:deskRotation,
+    valid:!deskPlacementError(w,deskEdit.type,deskCandidate.x,deskCandidate.z,deskRotation,
+      deskEdit.kind==='prop'?deskEdit.id:null,deskEdit.kind==='site'?deskEdit.site:null)}:null;
+  view?.refresh(game,group,{mode,buildType:chosenBuild,landscapeKind:chosenLandscape,rotation,selectedMove,
+    selectedDeskProp:selectedDeskPropId,deskGhost});view?.highlightRoute(selectedRoute);
 }
 $('desk-camera').onclick=()=>view?.focusDesk('all');
 $('desk-back').onclick=()=>{setMode('explore');view?.setCamera(false);};
@@ -385,10 +525,13 @@ document.addEventListener('fullscreenchange',()=>{
 });
 
 $('reset').onclick=()=>{if(isLive)return;if(!confirm('Reset both demo villages and remove all saved progress in this browser?'))return;localStorage.removeItem(SAVE_KEY);location.reload()};
-document.addEventListener('keydown',event=>{if(event.key.toLowerCase()==='r'&&!event.repeat){
+document.addEventListener('keydown',event=>{
+  if(document.activeElement?.matches('input,textarea,select'))return;
+  if(event.key.toLowerCase()==='r'&&!event.repeat){
+  if(deskEdit){$('skyre-desk-rotate').click();return;}
   if(mode==='build'){rotation=(rotation+1)%4;render()}
   else if(mode==='move'&&selectedMove){run({type:'rotate',x:selectedMove.x,z:selectedMove.z},()=>rotateAt(game[group],selectedMove.x,selectedMove.z),'Rotated the selected building.');}
-}if(event.key==='Escape'){setMode('explore')}});
+}if(event.key==='Escape'){if(deskEdit)finishDeskEdit(true);else setMode('explore')}});
 // Crops and workers advance while playing. Offline catch-up happens exactly once on load.
 const offlineActions=Object.values(initialWork).reduce((sum,c)=>sum+Object.values(c).reduce((a,b)=>a+b,0),0);
 if(offlineActions>0)showToast(`Welcome back! Your villagers completed ${offlineActions} jobs while you were away.`);

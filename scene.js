@@ -21,7 +21,7 @@ export function createScene(mount, callbacks){
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   mount.append(renderer.domElement);
   const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
-  controls.target.set(0,.15,0);controls.minDistance=3;controls.maxDistance=36;controls.maxPolarAngle=1.49;
+  controls.target.set(0,.15,0);controls.minDistance=3;controls.maxDistance=50;controls.maxPolarAngle=1.49;
   // Two-finger touch pan lets players explore the whole physical desk.
   controls.enablePan=true;controls.minDistance=1.35;
   const hemi=new THREE.HemisphereLight('#fff1d6','#70887e',2.05);scene.add(hemi);
@@ -266,18 +266,54 @@ export function createScene(mount, callbacks){
   }
 
   const raycaster=new THREE.Raycaster();const mouse=new THREE.Vector2();let start=null;
-  function hit(e){const b=renderer.domElement.getBoundingClientRect();mouse.x=(e.clientX-b.left)/b.width*2-1;mouse.y=-(e.clientY-b.top)/b.height*2+1;raycaster.setFromCamera(mouse,camera);
+  const deskPlane=new THREE.Plane(new THREE.Vector3(0,1,0),.965);
+  const deskIntersection=new THREE.Vector3();
+  let editDesk=false;
+  function deskPoint(e){
+    const box=renderer.domElement.getBoundingClientRect();
+    if(!box.width||!box.height)return null;
+    mouse.x=(e.clientX-box.left)/box.width*2-1;
+    mouse.y=-(e.clientY-box.top)/box.height*2+1;
+    raycaster.setFromCamera(mouse,camera);
+    if(!raycaster.ray.intersectPlane(deskPlane,deskIntersection))return null;
+    return {x:Math.round(deskIntersection.x*2)/2,z:Math.round(deskIntersection.z*2)/2};
+  }
+  function showDeskGhost(config){deskArt.placementPreview(config?.type,config?.x,config?.z,config?.rotation,config?.valid);}
+
+  function hit(e){
+    if(editDesk){
+      const point=deskPoint(e);
+      return point?{kind:'desk-ground',...point}:null;
+    }
+    const b=renderer.domElement.getBoundingClientRect();mouse.x=(e.clientX-b.left)/b.width*2-1;mouse.y=-(e.clientY-b.top)/b.height*2+1;raycaster.setFromCamera(mouse,camera);
     for(const match of raycaster.intersectObjects([deskArt.group,models,landscapeModels,grove,lamp,mirror,grid],true)){
       if(match.object.userData.hit)return match.object.userData.hit;
     }
     return null;
   }
-  renderer.domElement.addEventListener('pointerdown',e=>start={x:e.clientX,y:e.clientY});
+  const heldPointers=new Set();
+  renderer.domElement.addEventListener('pointerdown',e=>{
+    heldPointers.add(e.pointerId);
+    start={x:e.clientX,y:e.clientY,multiple:heldPointers.size>1};
+    if(editDesk&&heldPointers.size===1){
+      const point=deskPoint(e);if(point)callbacks.onDeskHover?.(point);
+    }
+  });
   renderer.domElement.addEventListener('pointerup',e=>{
-    if(!start)return;const d=Math.hypot(e.clientX-start.x,e.clientY-start.y);start=null;if(d>8)return;
+    const old=start;heldPointers.delete(e.pointerId);start=null;
+    if(!old||old.multiple||heldPointers.size)return;
+    const d=Math.hypot(e.clientX-old.x,e.clientY-old.y);
+    if(!editDesk&&d>8)return;
     const h=hit(e);if(h)callbacks.onHit(h);
   });
+  renderer.domElement.addEventListener('pointercancel',e=>{heldPointers.delete(e.pointerId);start=null;});
   renderer.domElement.addEventListener('pointermove',e=>{
+    if(editDesk){
+      if(heldPointers.size>1)return;
+      const point=deskPoint(e);
+      if(point)callbacks.onDeskHover?.(point);
+      return;
+    }
     if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>8){hover.visible=false;preview.visible=false;return;}
     hoverHit=hit(e);if(hoverHit?.kind==='tile'){hover.visible=true;hover.position.set(hoverHit.x,.22,hoverHit.z);}else hover.visible=false;
     updatePreview();
@@ -285,6 +321,12 @@ export function createScene(mount, callbacks){
   renderer.domElement.addEventListener('pointerleave',()=>{hover.visible=false;preview.visible=false;hoverHit=null;start=null});
   function refresh(game,id,options={}){
     currentGame=game;currentId=id;currentOptions={mode:'explore',buildType:'plot',rotation:0,selectedMove:null,...options};
+    editDesk=currentOptions.mode==='desk-place'||currentOptions.mode==='desk-move';
+    controls.enableRotate=!editDesk;
+    // In placement mode one finger moves the preview; two fingers still pan/zoom the desk.
+    controls.enablePan=true;
+    deskArt.selectProp(currentOptions.selectedDeskProp,game[id]);
+    showDeskGhost(editDesk?currentOptions.deskGhost:null);
     crops.length=0;turbines.length=0;chimneys.length=0;orchards.length=0;
     while(models.children.length){const g=models.children[0];models.remove(g);g.traverse(o=>{if(o.isMesh){if(!o.geometry.userData.sharedArt)o.geometry.dispose();if(!o.material.userData.sharedArt)o.material.dispose()}})}
     const world=game[id];const step=islandStage(world),scale=[1,1.18,1.42][step];
@@ -321,7 +363,10 @@ export function createScene(mount, callbacks){
   function focusDesk(which='all'){
     const target=which==='all'?{x:0,z:0}:deskArt.objects[which]||{x:6.0,z:-3.3};
     controls.target.set(target.x,-.1,target.z);
-    camera.position.set(target.x+(which==='all'?12:5.0),which==='all'?13:7.3,target.z+(which==='all'?18:8.8));
+    const narrow=mount.clientHeight>mount.clientWidth*1.40;
+    camera.position.set(target.x+(which==='all'?(narrow?16:12):5.0),
+      which==='all'?(narrow?19:13):7.3,
+      target.z+(which==='all'?(narrow?27:18):8.8));
     controls.update();
   }
   function focusVillager(workerId){
@@ -412,7 +457,7 @@ export function createScene(mount, callbacks){
     }
     controls.update();renderer.render(scene,camera);
   }tick();
-  return {refresh,setCamera,focusDesk,focusVillager,highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){sceneDisposed=true;cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();
+  return {refresh,setCamera,focusDesk,focusVillager,showDeskGhost,highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){sceneDisposed=true;cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();
     for(const rig of residentCache.values())characters.release(rig);
     residentCache.clear();characters.dispose();deskArt.dispose();renderer.dispose();renderer.domElement.remove()}};
 }

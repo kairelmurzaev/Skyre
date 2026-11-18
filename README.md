@@ -1,3 +1,32 @@
+# Skyre v1.5 — Free Desk Editor + Mobile Usability
+
+Skyre now supports **free placement of Crumb Stalls, Leaf Camps, Paper
+Workshops and Desk Lanterns on the open wooden desk**, in addition to its
+existing marked construction spots and fixed Pencil Footbridge.
+
+**Use it:** open the full-screen game, tap the coffee icon for Desk
+Adventures, and choose one of the four movable projects. The panel
+closes so the world remains visible. Tap or drag on the desk to move
+the green/red preview. Rotate with the button (R on desktop), then
+tap Build or Cancel. Buildings snap in half-unit steps and cannot
+overlap the island, desk edge, giant objects or other structures.
+
+**Edit afterward:** tap a finished structure in 3D, or select it from
+the Placed Desk Objects list. Use Move, Rotate or Store. Moving is free;
+storing refunds half its materials and asks for confirmation. Existing
+small v1.4 desk structures can be relocated without being charged again;
+the bridge stays at the fixed Book Crossing for expeditions.
+
+**Saves preserved:** the original skyre-village-v1 save key and Telegram
+database schema remain unchanged; desk.props and desk.nextPropId are
+additive fields initialized for older worlds. All actions are validated
+on the server as well as locally.
+
+The new [Clash of Clans design reference](docs/CLASH-DESIGN-REVIEW.md)
+reviews the game systems, visual readability, contextual tools,
+onboarding, progression and long-term activities, with a
+Skyre-specific adaptation plan.
+
 # Skyre v1.4 — Beyond the Island
 
 The desk is now part of the world. In the full-screen game, tap the coffee

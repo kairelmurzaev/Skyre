@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {DESK_SITES,DESK_BUILDS,deskAt} from './desk.js';
+import {DESK_SITES,DESK_BUILDS,deskAt,FREE_DESK_TYPES} from './desk.js';
 
 // Geometry-based desk landmarks, prop markers and tiny user-built structures.
 // Small and self-contained so Skyre remains practical on mobile WebGL.
@@ -7,6 +7,8 @@ export function createDeskArt(scene){
   const all=new THREE.Group();all.name='Explorable Desk';scene.add(all);
   const fixtures=new THREE.Group();all.add(fixtures);
   const constructions=new THREE.Group();all.add(constructions);
+  const previewGroup=new THREE.Group();previewGroup.name='Desk Placement Preview';all.add(previewGroup);
+  const selectionGroup=new THREE.Group();selectionGroup.name='Selected Desk Prop';all.add(selectionGroup);
   const M=Object.fromEntries(Object.entries({
     wood:'#b58b60',woodDark:'#5f3d30',woodLight:'#e4c7a0',paper:'#fff0c6',
     coffee:'#573427',mug:'#eadad1',mugRim:'#fff9ec',bookRed:'#ac5b62',
@@ -18,6 +20,7 @@ export function createDeskArt(scene){
   const padMat=new THREE.MeshBasicMaterial({color:'#edd29a',transparent:true,opacity:.10,depthWrite:false,side:THREE.DoubleSide});
   const padRingMat=new THREE.MeshBasicMaterial({color:'#e3d197',transparent:true,opacity:.72,depthWrite:false});
   const activeRingMat=new THREE.MeshBasicMaterial({color:'#9dddab',transparent:true,opacity:.92,depthWrite:false});
+  const propPadMat=new THREE.MeshBasicMaterial({color:'#a9dca9',transparent:true,opacity:.09,side:THREE.DoubleSide,depthWrite:false});
   function part(parent,geometry,material,position=[0,0,0],rotation){
     const o=new THREE.Mesh(geometry,material);o.position.set(...position);if(rotation)o.rotation.set(...rotation);
     o.castShadow=true;o.receiveShadow=true;parent.add(o);return o;
@@ -168,9 +171,42 @@ export function createDeskArt(scene){
     box(g,.30,.40,.29,[0,1.22,0],glow);
     part(g,new THREE.ConeGeometry(.36,.22,4),M.gold,[0,1.64,0],[0,Math.PI/4,0]);
   }
-  let signature='';
+  const ghostValid=new THREE.MeshBasicMaterial({color:'#aaf0b7',transparent:true,opacity:.56,depthTest:false,depthWrite:false});
+  const ghostInvalid=new THREE.MeshBasicMaterial({color:'#ff8c86',transparent:true,opacity:.52,depthTest:false,depthWrite:false});
+  let ghostType=null;
+  function buildSmallModel(type,group){
+    if(type==='stall')makeStall(group);
+    if(type==='camp')makeCamp(group);
+    if(type==='workbench')makeWorkbench(group);
+    if(type==='lantern')makeLantern(group);
+  }
+  function placementPreview(type,x,z,rotation=0,valid=false){
+    if(!type||!FREE_DESK_TYPES.includes(type)){
+      previewGroup.visible=false;return;
+    }
+    if(type!==ghostType){
+      for(const obj of [...previewGroup.children]){
+        previewGroup.remove(obj);
+        obj.traverse(mesh=>{if(mesh.isMesh)mesh.geometry.dispose()});
+      }
+      buildSmallModel(type,previewGroup);
+      for(const object of previewGroup.children){
+        object.traverse(mesh=>{
+          if(!mesh.isMesh)return;
+          mesh.raycast=()=>{};
+          mesh.castShadow=false;mesh.receiveShadow=false;
+        });
+      }
+      ghostType=type;
+    }
+    previewGroup.position.set(x,-.95,z);
+    previewGroup.rotation.y=rotation*Math.PI/2;
+    previewGroup.visible=true;
+    previewGroup.traverse(obj=>{if(obj.isMesh)obj.material=valid?ghostValid:ghostInvalid;});
+  }
+  let signature='',selectedId=null;
   function refresh(world,buildMode=false){
-    const next=JSON.stringify(world.desk?.builds||[]);
+    const next=JSON.stringify([world.desk?.builds||[],world.desk?.props||[]]);
     if(signature!==next){
       for(const old of [...constructions.children]){
         constructions.remove(old);
@@ -189,7 +225,25 @@ export function createDeskArt(scene){
         if(b.type==='bridge')group.position.set(0,0,0);
         hitGroup(group,{kind:'desk-site',id:site.id});
       }
+      for(const prop of (world.desk?.props||[])){
+        if(!FREE_DESK_TYPES.includes(prop.type))continue;
+        const group=new THREE.Group();
+        group.position.set(prop.x,-.96,prop.z);
+        group.rotation.y=(prop.rotation||0)*Math.PI/2;
+        constructions.add(group);
+        buildSmallModel(prop.type,group);
+        // Low transparent footprint makes small props easier to tap.
+        const pad=part(group,new THREE.CircleGeometry(prop.type==='lantern'?.52:.90,22),
+          propPadMat,[0,.018,0],[-Math.PI/2,0,0]);
+        pad.castShadow=false;
+        hitGroup(group,{kind:'desk-prop',id:prop.id});
+      }
       signature=next;
+    }
+    if(selectedId){
+      const p=(world.desk?.props||[]).find(x=>x.id===selectedId);
+      selectionGroup.visible=!!p;
+      if(p)selectionGroup.position.set(p.x,-.90,p.z);
     }
     for(const s of DESK_SITES){
       const spot=spots.get(s.id),occupied=!!deskAt(world,s.id);
@@ -198,6 +252,14 @@ export function createDeskArt(scene){
       spot.plaque.visible=!occupied;
       spot.circle.material=buildMode?activeRingMat:padRingMat;
     }
+  }
+  const halo=ring(selectionGroup,.85,.052,[0,0,0],activeRingMat);
+  halo.raycast=()=>{};selectionGroup.visible=false;
+  function selectProp(id,world){
+    selectedId=id||null;
+    const p=(world?.desk?.props||[]).find(item=>item.id===selectedId);
+    selectionGroup.visible=!!p;
+    if(p)selectionGroup.position.set(p.x,-.90,p.z);
   }
   function animate(t){
     for(let i=0;i<steam.length;i++){
@@ -213,9 +275,9 @@ export function createDeskArt(scene){
       if(o.isSprite){o.material.map?.dispose();o.material.dispose();}
     });
     for(const m of Object.values(M))m.dispose();
-    for(const m of [glow,padMat,padRingMat,activeRingMat])m.dispose();
+    for(const m of [glow,padMat,padRingMat,activeRingMat,propPadMat,ghostValid,ghostInvalid])m.dispose();
     scene.remove(all);
   }
-  return {group:all,refresh,animate,dispose,objects:{mug:{x:-8.15,z:-4.7},plant:{x:-8.4,z:4.75},books:{x:8.2,z:-5.25}}};
+  return {group:all,refresh,animate,dispose,placementPreview,selectProp,objects:{mug:{x:-8.15,z:-4.7},plant:{x:-8.4,z:4.75},books:{x:8.2,z:-5.25}}};
 }
 

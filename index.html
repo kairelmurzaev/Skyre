@@ -71,6 +71,17 @@
     <button class="skyre-nav-item" data-shell-open="people" aria-expanded="false" type="button"><span class="symbol">☺</span><span class="name">People</span></button>
     <button class="skyre-nav-item" id="skyre-more-button" type="button"><span class="symbol">☷</span><span class="name">More</span></button>
   </nav>
+  <div class="skyre-desk-edit" id="skyre-desk-edit" hidden aria-label="Desk placement controls">
+    <div class="skyre-desk-edit-head">
+      <strong id="skyre-desk-edit-title">Placing a desk object</strong>
+      <small id="skyre-desk-edit-status">Touch or drag on the desk to select a spot.</small>
+    </div>
+    <div class="skyre-desk-edit-actions">
+      <button type="button" id="skyre-desk-rotate">↻ Rotate</button>
+      <button type="button" id="skyre-desk-cancel">✕ Cancel</button>
+      <button type="button" id="skyre-desk-confirm" disabled>✓ Place</button>
+    </div>
+  </div>
   <div class="skyre-drawer-head" id="skyre-drawer-head" aria-label="Tool panel">
     <span id="skyre-drawer-title">Build</span>
     <button type="button" id="skyre-drawer-close" hidden aria-label="Close panel">×</button>
@@ -113,6 +124,10 @@
         <div class="inventory-subtitle">BUILD TINY STRUCTURES</div>
         <p class="section-description" id="desk-status">Choose a project, then tap a glowing spot on the desk or use the site buttons below.</p>
         <div class="desk-tiles" id="desk-build-catalog"></div>
+        <p class="section-description">Select a project and choose <b>Place freely</b> to arrange it on open desk space. Keep the pencil footbridge at its fixed crossing so villagers can reach the books.</p>
+        <div id="desk-selected" class="desk-inspector" hidden aria-live="polite"></div>
+        <div class="inventory-subtitle">YOUR PLACED DESK OBJECTS</div>
+        <div id="desk-props" class="desk-sites"></div>
         <div class="inventory-subtitle">DESK BUILDING SPOTS</div>
         <div id="desk-sites" class="desk-sites"></div>
       </section>
