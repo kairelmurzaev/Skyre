@@ -1,3 +1,23 @@
+# Skyre v1.6 — Bounded Camera
+
+The camera now stays connected to the actual wooden desk. You can freely
+**rotate 360 degrees, tilt all the way down into an overhead view, zoom in
+closely on any island/desk object, and pan across the desk**. The focus
+cannot be dragged beyond the physical tabletop, so it is no longer possible
+to lose the world off-screen.
+
+Camera bounds preserve the same view angle and zoom when you reach an edge:
+rather than snapping back or resetting, the camera simply stops panning
+further. They also limit extreme vertical panning and dynamically adjust
+close-up, low-angle views so the desk remains visible.
+
+**Controls:** drag to rotate; scroll/pinch to zoom; right-drag on desktop
+or two-finger drag on phones to move across the desk. The existing zoom
+button and Desk Adventures camera presets still work. Existing worlds,
+villagers, buildings, and saves are unchanged.
+
+See [Camera controls](docs/CAMERA-CONTROLS.md) for limits and QA notes.
+
 # Skyre v1.5 — Free Desk Editor + Mobile Usability
 
 Skyre now supports **free placement of Crumb Stalls, Leaf Camps, Paper

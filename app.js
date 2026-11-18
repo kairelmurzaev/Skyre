@@ -188,7 +188,14 @@ function onHit(hit){
   if(found?.type==='orchard')return run({type:'orchard',x,z},()=>harvestOrchard(w,x,z,Date.now(),received(game,group).breeze),'Collected magical fruit.');
   showToast(tileInfo(x,z));
 }
-try{view=createScene($('scene'),{onHit,onDeskHover,getMode:()=>mode})}catch(err){
+try{
+  view=createScene($('scene'),{onHit,onDeskHover,getMode:()=>mode});
+  // Expose camera state only to localhost QA, never to the hosted game UI.
+  if(['localhost','127.0.0.1'].includes(location.hostname)&&
+      new URLSearchParams(location.search).has('cameraQA')){
+    window.__skyreCameraState=()=>view.getCameraState();
+  }
+}catch(err){
   $('scene').insertAdjacentHTML('afterbegin','<p style="padding:30px;color:#ffdfb7">Your browser could not start 3D graphics. Try a browser with WebGL enabled.</p>');
   console.error('Skyre WebGL:',err);
 }

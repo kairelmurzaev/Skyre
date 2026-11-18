@@ -7,6 +7,7 @@ import {planWorkerRoute} from './routing.js';
 import {createRiggedCharacterFactory} from './rigged-characters.js';
 import {createWorldArt} from './world-art.js';
 import {createDeskArt} from './desk-art.js';
+import {DESK_CAMERA_BOUNDS,clampOrbitToDesk} from './camera-bounds.js';
 
 // Skyre World Remaster: authored stylized buildings, painterly textures and instanced foliage.
 // Gameplay rules are unchanged; art objects are local scene decorations.
@@ -21,9 +22,18 @@ export function createScene(mount, callbacks){
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   mount.append(renderer.domElement);
   const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
-  controls.target.set(0,.15,0);controls.minDistance=3;controls.maxDistance=50;controls.maxPolarAngle=1.49;
+  controls.target.set(0,.15,0);
+  controls.minDistance=1.35;
+  controls.maxDistance=DESK_CAMERA_BOUNDS.maxDistance;
+  controls.maxPolarAngle=1.49; // keep overhead / free 360° orbit available
+  // Limit the orbital focal point to the physical desk instead of allowing
+  // unbounded two-finger panning into empty space.
+  const updateDeskCamera=()=>{
+    controls.update();
+    clampOrbitToDesk(camera,controls);
+  };
   // Two-finger touch pan lets players explore the whole physical desk.
-  controls.enablePan=true;controls.minDistance=1.35;
+  controls.enablePan=true;
   const hemi=new THREE.HemisphereLight('#fff1d6','#70887e',2.05);scene.add(hemi);
   const sun=new THREE.DirectionalLight('#fff0c8',2.55);sun.position.set(-6,12,8);sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-11;sun.shadow.camera.right=11;sun.shadow.camera.top=11;sun.shadow.camera.bottom=-11;scene.add(sun);
@@ -359,7 +369,7 @@ export function createScene(mount, callbacks){
     });
     updatePreview();
   }
-  function setCamera(close){camera.position.set(...(close?[6,7.5,10]:[9.8,9.2,14.8]));controls.target.set(0,.15,0);controls.update()}
+  function setCamera(close){camera.position.set(...(close?[6,7.5,10]:[9.8,9.2,14.8]));controls.target.set(0,.15,0);updateDeskCamera()}
   function focusDesk(which='all'){
     const target=which==='all'?{x:0,z:0}:deskArt.objects[which]||{x:6.0,z:-3.3};
     controls.target.set(target.x,-.1,target.z);
@@ -367,7 +377,7 @@ export function createScene(mount, callbacks){
     camera.position.set(target.x+(which==='all'?(narrow?16:12):5.0),
       which==='all'?(narrow?19:13):7.3,
       target.z+(which==='all'?(narrow?27:18):8.8));
-    controls.update();
+    updateDeskCamera();
   }
   function focusVillager(workerId){
     const selected=(workerId?walkers.find(w=>w.worker.id===workerId):null)||walkers[0];
@@ -375,7 +385,7 @@ export function createScene(mount, callbacks){
     const pos=selected.v.position;
     controls.target.set(pos.x,pos.y+.61,pos.z);
     camera.position.set(pos.x+1.15,pos.y+1.65,pos.z+1.65);
-    controls.update();
+    updateDeskCamera();
     return true;
   }
   function resize(){const w=mount.clientWidth,h=mount.clientHeight;if(w<1||h<1)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
@@ -455,9 +465,15 @@ export function createScene(mount, callbacks){
       }
       characters.animate(walker.rig,t,walker.phase,{walking,carrying,working});
     }
-    controls.update();renderer.render(scene,camera);
+    updateDeskCamera();renderer.render(scene,camera);
   }tick();
-  return {refresh,setCamera,focusDesk,focusVillager,showDeskGhost,highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){sceneDisposed=true;cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();
+  return {refresh,setCamera,focusDesk,focusVillager,showDeskGhost,
+    getCameraState:()=>({
+      target:controls.target.toArray(),position:camera.position.toArray(),
+      distance:controls.getDistance(),polar:controls.getPolarAngle(),
+      azimuth:controls.getAzimuthalAngle()
+    }),
+    highlightRoute(workerId){highlightedWorker=workerId;drawHighlightedRoute();},dispose(){sceneDisposed=true;cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();
     for(const rig of residentCache.values())characters.release(rig);
     residentCache.clear();characters.dispose();deskArt.dispose();renderer.dispose();renderer.domElement.remove()}};
 }
